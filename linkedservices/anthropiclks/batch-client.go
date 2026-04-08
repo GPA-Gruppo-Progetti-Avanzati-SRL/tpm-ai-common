@@ -1,0 +1,141 @@
+package anthropiclks
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/rs/zerolog/log"
+)
+
+type batchClientImpl struct {
+	verbose   bool
+	apiClient anthropic.Client
+	options   ClientOptions
+}
+
+func (c *batchClientImpl) Close() {}
+
+func (c *batchClientImpl) SubmitBatch(requests []BatchRequest) (string, error) {
+	const semLogContext = "anthropic-lks-batch-client::submit-batch"
+
+	batchRequests := make([]anthropic.MessageBatchNewParamsRequest, 0, len(requests))
+	for _, req := range requests {
+		r := Request{}
+		for _, p := range req.Params {
+			p(&r)
+		}
+
+		b, err := c.options.Prompt.Text(r.TextVariables())
+		if err != nil {
+			log.Error().Err(err).Str("custom-id", req.CustomID).Msg(semLogContext)
+			return "", err
+		}
+
+		batchRequests = append(batchRequests, anthropic.MessageBatchNewParamsRequest{
+			CustomID: req.CustomID,
+			Params: anthropic.MessageBatchNewParamsRequestParams{
+				MaxTokens:   c.options.MaxTokens,
+				Temperature: anthropic.Float(c.options.Temperature),
+				System:      c.options.Prompt.System,
+				Messages: []anthropic.MessageParam{
+					anthropic.NewUserMessage(anthropic.NewTextBlock(string(b))),
+				},
+				Model: c.options.Model,
+			},
+		})
+	}
+
+	batch, err := c.apiClient.Messages.Batches.New(context.Background(), anthropic.MessageBatchNewParams{
+		Requests: batchRequests,
+	})
+	if err != nil {
+		logError(err).Msg(semLogContext)
+		return "", err
+	}
+
+	if c.verbose {
+		fmt.Println("Request -------------------")
+		fmt.Println(batch.RawJSON())
+		fmt.Println("-------------------")
+	}
+
+	return batch.ID, nil
+}
+
+func (c *batchClientImpl) GetBatchStatus(batchID string) (*BatchStatus, error) {
+	const semLogContext = "anthropic-lks-batch-client::get-batch-status"
+
+	batch, err := c.apiClient.Messages.Batches.Get(context.Background(), batchID)
+	if err != nil {
+		logError(err).Msg(semLogContext)
+		return nil, err
+	}
+
+	if c.verbose {
+		fmt.Println("Status -------------------")
+		fmt.Println(batch.RawJSON())
+		fmt.Println("-------------------")
+	}
+
+	return &BatchStatus{
+		ID:               batch.ID,
+		ProcessingStatus: string(batch.ProcessingStatus),
+		RequestCounts: BatchRequestCounts{
+			Processing: batch.RequestCounts.Processing,
+			Succeeded:  batch.RequestCounts.Succeeded,
+			Errored:    batch.RequestCounts.Errored,
+			Canceled:   batch.RequestCounts.Canceled,
+			Expired:    batch.RequestCounts.Expired,
+		},
+		ExpiresAt: batch.ExpiresAt,
+	}, nil
+}
+
+func (c *batchClientImpl) GetBatchResults(batchID string) ([]BatchResult, error) {
+	const semLogContext = "anthropic-lks-batch-client::get-batch-results"
+
+	stream := c.apiClient.Messages.Batches.ResultsStreaming(context.Background(), batchID)
+	defer stream.Close()
+
+	var results []BatchResult
+	for stream.Next() {
+		item := stream.Current()
+
+		if c.verbose {
+			fmt.Println("Stream Result: -------------------")
+			fmt.Println(item.RawJSON())
+			fmt.Println("-------------------")
+		}
+
+		br := BatchResult{CustomID: item.CustomID}
+
+		switch item.Result.Type {
+		case "succeeded":
+			succeeded := item.Result.AsSucceeded()
+			resp, err := c.options.Prompt.ParseMessage(&succeeded.Message)
+			if err != nil {
+				log.Error().Err(err).Str("custom-id", item.CustomID).Msg(semLogContext)
+				br.Err = err
+			} else {
+				br.Response = &Response{Content: resp}
+			}
+		case "errored":
+			errored := item.Result.AsErrored()
+			br.Err = fmt.Errorf("batch item errored: %s", errored.Error.Error.Message)
+		case "canceled":
+			br.Err = fmt.Errorf("batch item canceled")
+		case "expired":
+			br.Err = fmt.Errorf("batch item expired")
+		}
+
+		results = append(results, br)
+	}
+
+	if err := stream.Err(); err != nil {
+		logError(err).Msg(semLogContext)
+		return nil, err
+	}
+
+	return results, nil
+}
