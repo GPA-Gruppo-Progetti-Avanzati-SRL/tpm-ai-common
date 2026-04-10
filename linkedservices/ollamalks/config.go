@@ -13,21 +13,27 @@ import (
  * for general options see https://github.com/anthropics/anthropic-sdk-go/blob/main/option/requestoption.go
  */
 
-type ClientOptions struct {
-	Prompt prompts.PromptTemplate `yaml:"prompt,omitempty" mapstructure:"prompt,omitempty" json:"prompt,omitempty"`
-	Model  string                 `yaml:"model,omitempty" mapstructure:"model,omitempty" json:"model,omitempty"`
+type GenerateOptions struct {
+	NumCtx      int     `yaml:"num_ctx,omitempty" mapstructure:"num_ctx,omitempty" json:"num_ctx,omitempty"`
+	Temperature float64 `yaml:"temperature,omitempty" mapstructure:"temperature,omitempty" json:"temperature,omitempty"`
 }
 
-type ClientOption func(o *ClientOptions)
+type RequestOptions struct {
+	Prompt          prompts.PromptTemplate `yaml:"prompt,omitempty" mapstructure:"prompt,omitempty" json:"prompt,omitempty"`
+	Model           string                 `yaml:"model,omitempty" mapstructure:"model,omitempty" json:"model,omitempty"`
+	GenerateOptions *GenerateOptions       `yaml:"options,omitempty" mapstructure:"options,omitempty" json:"options,omitempty"`
+}
 
-func WithPrompt(p prompts.PromptTemplate) ClientOption {
-	return func(o *ClientOptions) {
+type RequestOption func(o *RequestOptions)
+
+func WithPrompt(p prompts.PromptTemplate) RequestOption {
+	return func(o *RequestOptions) {
 		o.Prompt = p
 	}
 }
 
-func WithPromptName(n string) ClientOption {
-	return func(o *ClientOptions) {
+func WithPromptName(n string) RequestOption {
+	return func(o *RequestOptions) {
 		pt, err := prompts.GetPrompt(n)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("failed to get prompt %s", n)
@@ -37,15 +43,15 @@ func WithPromptName(n string) ClientOption {
 	}
 }
 
-func WithModel(n string) ClientOption {
-	return func(o *ClientOptions) {
+func WithModel(n string) RequestOption {
+	return func(o *RequestOptions) {
 		o.Model = n
 	}
 }
 
-var defCliOptions = ClientOptions{Model: "granite4:latest"}
+var defCliOptions = RequestOptions{Model: "granite4:latest"}
 
-func DefaultClientOptions(opts ClientOptions) ClientOptions {
+func DefaultClientOptions(opts RequestOptions) RequestOptions {
 	opts.Model = util.StringCoalesce(opts.Model, defCliOptions.Model)
 	return opts
 }
@@ -63,8 +69,8 @@ type Config struct {
 	Token string `yaml:"token,omitempty" mapstructure:"token,omitempty" json:"token,omitempty"`
 	Url   string `yaml:"url,omitempty" mapstructure:"url,omitempty" json:"url,omitempty"`
 
-	RequestTimeout time.Duration `yaml:"request-timeout,omitempty" mapstructure:"request-timeout,omitempty" json:"request-timeout,omitempty"`
-	Mockup         *MockupConfig `yaml:"mockup,omitempty" mapstructure:"mockup,omitempty" json:"mockup,omitempty"`
-	Verbose        bool          `yaml:"verbose,omitempty" mapstructure:"verbose,omitempty" json:"verbose,omitempty"`
-	ClientOptions  ClientOptions `yaml:"client-options,omitempty" mapstructure:"client-options,omitempty" json:"client-options,omitempty"`
+	RequestTimeout time.Duration  `yaml:"request-timeout,omitempty" mapstructure:"request-timeout,omitempty" json:"request-timeout,omitempty"`
+	Mockup         *MockupConfig  `yaml:"mockup,omitempty" mapstructure:"mockup,omitempty" json:"mockup,omitempty"`
+	Verbose        bool           `yaml:"verbose,omitempty" mapstructure:"verbose,omitempty" json:"verbose,omitempty"`
+	RequestOptions RequestOptions `yaml:"request-options,omitempty" mapstructure:"request-options,omitempty" json:"request-options,omitempty"`
 }

@@ -18,10 +18,15 @@ var cobExample []byte
 func TestClient(t *testing.T) {
 
 	cfg := &ollamalks.Config{
-		Token:         "",
-		Url:           "http://localhost:11434/api/generate",
-		Verbose:       true,
-		ClientOptions: ollamalks.ClientOptions{},
+		Token:   "",
+		Url:     "http://localhost:11434",
+		Verbose: true,
+		RequestOptions: ollamalks.RequestOptions{
+			GenerateOptions: &ollamalks.GenerateOptions{
+				NumCtx: 100000,
+				// Temperature: 0.2,
+			},
+		},
 	}
 
 	lks, err := ollamalks.Initialize(cfg)

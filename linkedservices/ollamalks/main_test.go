@@ -39,10 +39,10 @@ func TestMain(m *testing.M) {
 		System:       "You are a senior Cobol developer with extensive knowledge in mainframe cobol cics programming",
 		Vars:         []string{"COBOL_SOURCE"},
 		Sections: []prompts.MessagePart{
-			{Name: ScratchPadSection, Ext: ".md", Summary: false, Ct: ContentTypeTextMarkdown},
-			{Name: OverviewSection, Ext: ".md", Summary: false, Ct: ContentTypeTextMarkdown},
-			{Name: SummarySection, Ext: ".txt", Summary: true, Ct: ContentTypeTextPlain},
-			{Name: MermaidSection, Ext: ".mmd", Summary: false, Ct: ContentTypeApplicationVndMermaid},
+			{Name: ScratchPadSection, Ext: ".md", IsSummary: false, Ct: ContentTypeTextMarkdown},
+			{Name: OverviewSection, Ext: ".md", IsSummary: false, Ct: ContentTypeTextMarkdown},
+			{Name: SummarySection, Ext: ".txt", IsSummary: true, Ct: ContentTypeTextPlain},
+			{Name: MermaidSection, Ext: ".mmd", IsSummary: false, Ct: ContentTypeApplicationVndMermaid},
 		},
 	})
 	if err != nil {
