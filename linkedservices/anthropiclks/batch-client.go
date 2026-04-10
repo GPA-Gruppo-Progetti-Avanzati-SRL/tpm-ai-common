@@ -37,7 +37,7 @@ func (c *batchClientImpl) SubmitBatch(requests []BatchRequest) (string, error) {
 			Params: anthropic.MessageBatchNewParamsRequestParams{
 				MaxTokens:   c.options.MaxTokens,
 				Temperature: anthropic.Float(c.options.Temperature),
-				System:      c.options.Prompt.System,
+				System:      []anthropic.TextBlockParam{{Text: c.options.Prompt.System}},
 				Messages: []anthropic.MessageParam{
 					anthropic.NewUserMessage(anthropic.NewTextBlock(string(b))),
 				},
@@ -113,7 +113,7 @@ func (c *batchClientImpl) GetBatchResults(batchID string) ([]BatchResult, error)
 		switch item.Result.Type {
 		case "succeeded":
 			succeeded := item.Result.AsSucceeded()
-			resp, err := c.options.Prompt.ParseMessage(&succeeded.Message)
+			resp, err := ParseMessage(c.options.Prompt, &succeeded.Message)
 			if err != nil {
 				log.Error().Err(err).Str("custom-id", item.CustomID).Msg(semLogContext)
 				br.Err = err

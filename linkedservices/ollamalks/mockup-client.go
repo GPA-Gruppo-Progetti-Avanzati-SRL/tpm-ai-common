@@ -77,7 +77,7 @@ func (c *mockupClient) Execute(params ...RequestParam) (*Response, error) {
 				return nil, err
 			}
 
-			resp, err := msg.RetrieveContentFromResponse(c.options.Prompt.Sections)
+			resp, err := msg.RetrieveContentFromResponse(c.options.Prompt)
 			if err != nil {
 				log.Error().Err(err).Msg(semLogContext)
 				return nil, err

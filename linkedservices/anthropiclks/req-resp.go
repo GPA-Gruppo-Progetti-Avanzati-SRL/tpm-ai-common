@@ -3,7 +3,7 @@ package anthropiclks
 import (
 	"time"
 
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/anthropiclks/prompts"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/prompts"
 )
 
 type Request struct {
@@ -41,7 +41,7 @@ func WithPromptInput(vt prompts.VariableType, n string, ndx int, v []byte) Reque
 }
 
 type Response struct {
-	Content map[string]prompts.MessageSection
+	Content map[string]prompts.MessagePart
 }
 
 // BatchRequest is a single named request within a batch submission.

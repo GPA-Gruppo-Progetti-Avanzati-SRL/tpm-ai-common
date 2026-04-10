@@ -35,7 +35,7 @@ func (c *clientImpl) Execute(params ...RequestParam) (*Response, error) {
 	message, err := c.apiClient.Messages.New(context.Background(), anthropic.MessageNewParams{
 		MaxTokens:   c.options.MaxTokens,
 		Temperature: anthropic.Float(c.options.Temperature),
-		System:      c.options.Prompt.System,
+		System:      []anthropic.TextBlockParam{{Text: c.options.Prompt.System}},
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(string(b))),
 		},
@@ -57,7 +57,7 @@ func (c *clientImpl) Execute(params ...RequestParam) (*Response, error) {
 		return nil, errors.New("no message returned")
 	}
 
-	resp, err := c.options.Prompt.ParseMessage(message)
+	resp, err := ParseMessage(c.options.Prompt, message)
 	if err != nil {
 		logError(err).Msg(semLogContext)
 		return nil, err

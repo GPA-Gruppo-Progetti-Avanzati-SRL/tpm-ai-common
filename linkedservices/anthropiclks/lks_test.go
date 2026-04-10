@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/anthropiclks"
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/anthropiclks/prompts"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/prompts"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-client/restclient"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -33,7 +33,7 @@ func TestClient(t *testing.T) {
 	lks, err := anthropiclks.Initialize(cfg)
 	require.NoError(t, err)
 
-	prompt, err := prompts.GetPrompt(prompts.PromptProgramSummary)
+	prompt, err := prompts.GetPrompt(PromptProgramSummary)
 	require.NoError(t, err)
 
 	cli, err := lks.NewClient(
@@ -82,7 +82,7 @@ func TestMockupClient(t *testing.T) {
 			HostName:   "localhost",
 			ServerPort: 3001,
 			HttpScheme: "http",
-			Endpoint:   "/anthropic/test",
+			Endpoint:   "/api/anthropic",
 		},
 		Verbose: false,
 	}
@@ -95,7 +95,7 @@ func TestMockupClient(t *testing.T) {
 
 	fmt.Println(string(b))
 
-	prompt, err := prompts.GetPrompt(prompts.PromptProgramSummary)
+	prompt, err := prompts.GetPrompt(PromptProgramSummary)
 	require.NoError(t, err)
 
 	cli, err := lks.NewClient(

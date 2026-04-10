@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/ollamalks"
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/ollamalks/prompts"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/prompts"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,7 +36,7 @@ func TestClient(t *testing.T) {
 	lks, err := ollamalks.Initialize(cfg)
 	require.NoError(t, err)
 
-	prompt, err := prompts.GetPrompt(prompts.PromptProgramSummary)
+	prompt, err := prompts.GetPrompt(PromptProgramSummary)
 	require.NoError(t, err)
 
 	cli, err := lks.NewClient(

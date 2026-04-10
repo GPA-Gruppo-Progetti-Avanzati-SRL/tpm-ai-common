@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/ollamalks/prompts"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/prompts"
 	"github.com/rs/zerolog/log"
 )
 
@@ -47,7 +47,7 @@ func WithPromptInput(vt prompts.VariableType, n string, ndx int, v []byte) Reque
 }
 
 type Response struct {
-	Content map[string]prompts.MessageSection
+	Content map[string]prompts.MessagePart
 }
 
 type Message struct {
@@ -71,7 +71,7 @@ type NonStreamedResponse struct {
 	EvalDuration       int       `json:"eval_duration" yaml:"eval_duration" mapstructure:"eval_duration"`
 }
 
-func (nr *NonStreamedResponse) RetrieveContentFromResponse(sections []string) (map[string]prompts.MessageSection, error) {
+func (nr *NonStreamedResponse) RetrieveContentFromResponse(p prompts.PromptTemplate) (map[string]prompts.MessagePart, error) {
 
 	const semLogContext = "anthropic-lks-client::process-message"
 	var err error
@@ -82,19 +82,10 @@ func (nr *NonStreamedResponse) RetrieveContentFromResponse(sections []string) (m
 		return nil, err
 	}
 
-	content, err := ParseTextContent(nr.Response, sections)
+	parsedPrompt, err := p.ParseTextContent(nr.Response)
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
 		return nil, err
-	}
-
-	parsedPrompt := make(map[string]prompts.MessageSection)
-	for sn, sv := range content {
-		if si, ok := prompts.SectionMap[sn]; ok {
-			parsedPrompt[sn] = prompts.MessageSection{Name: si.Name, Ext: si.Ext, Summary: si.Summary, Data: []byte(sv)}
-		} else {
-			log.Warn().Str("section", sn).Msg(semLogContext + " - unknown section")
-		}
 	}
 
 	return parsedPrompt, nil

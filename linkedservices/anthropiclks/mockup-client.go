@@ -39,7 +39,7 @@ func (c *mockupClient) Execute(params ...RequestParam) (*Response, error) {
 	anthropicMessageParams := anthropic.MessageNewParams{
 		MaxTokens:   c.options.MaxTokens,
 		Temperature: anthropic.Float(c.options.Temperature),
-		System:      c.options.Prompt.System,
+		System:      []anthropic.TextBlockParam{{Text: c.options.Prompt.System}},
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(string(b))),
 		},
@@ -79,7 +79,7 @@ func (c *mockupClient) Execute(params ...RequestParam) (*Response, error) {
 			return nil, err
 		}
 
-		resp, err := c.options.Prompt.ParseMessage(&msg)
+		resp, err := ParseMessage(c.options.Prompt, &msg)
 		if err != nil {
 			log.Error().Err(err).Msg(semLogContext)
 			return nil, err
