@@ -24,7 +24,8 @@ func NewPromptsRegistry(rootFolder string, embeddedTemplates embed.FS) error {
 	fs, err := fileutil.FindEmbeddedFiles(embeddedTemplates, rootFolder,
 		fileutil.WithFindOptionNavigateSubDirs(),
 		fileutil.WithFindFileType(fileutil.FileTypeFile),
-		fileutil.WithFindOptionExcludeRootFolderInNames())
+		fileutil.WithFindOptionExcludeRootFolderInNames(),
+		fileutil.WithFindOptionPreloadContent())
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
 		return err

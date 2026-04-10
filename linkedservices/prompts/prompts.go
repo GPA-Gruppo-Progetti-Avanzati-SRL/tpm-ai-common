@@ -118,6 +118,7 @@ func (p PromptTemplate) ParseTextContent(text string) (map[string]MessagePart, e
 	content, err := extractTextForParts(text, p.SectionNames())
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
+		fmt.Println(text)
 		return nil, err
 	}
 
@@ -160,7 +161,7 @@ func extractTextForParts(text string, delimiters []string) (map[string]string, e
 		switch lineType {
 		case LineTypeBODelimiter:
 			if status != StatusZero {
-				return nil, fmt.Errorf("found bof-scrathcpad when status in %d", status)
+				return nil, fmt.Errorf("found %s when status in %d (%s)", delim, status, currentDelimiter)
 			}
 			currentDelimiter = delim
 			if sline != "" {

@@ -60,8 +60,9 @@ type MockupConfig struct {
 }
 
 type Config struct {
-	ApiKey         string        `yaml:"api-key,omitempty" mapstructure:"api-key,omitempty" json:"api-key,omitempty"`
-	MaxRetries     int           `yaml:"max-retries,omitempty" mapstructure:"max-retries,omitempty" json:"max-retries,omitempty"`
+	Token string `yaml:"token,omitempty" mapstructure:"token,omitempty" json:"token,omitempty"`
+	Url   string `yaml:"url,omitempty" mapstructure:"url,omitempty" json:"url,omitempty"`
+
 	RequestTimeout time.Duration `yaml:"request-timeout,omitempty" mapstructure:"request-timeout,omitempty" json:"request-timeout,omitempty"`
 	Mockup         *MockupConfig `yaml:"mockup,omitempty" mapstructure:"mockup,omitempty" json:"mockup,omitempty"`
 	Verbose        bool          `yaml:"verbose,omitempty" mapstructure:"verbose,omitempty" json:"verbose,omitempty"`

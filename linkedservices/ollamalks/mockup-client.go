@@ -1,24 +1,22 @@
 package ollamalks
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
-	"net/http"
+	"strings"
 
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-archive/har"
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-client/restclient"
+	"github.com/eslider/go-ollama"
 	"github.com/rs/zerolog/log"
 )
 
 type mockupClient struct {
 	cfg        *MockupConfig
 	options    ClientOptions
-	httpClient *restclient.Client
+	httpClient *ollama.Client
 }
 
 func (c *mockupClient) Close() {
 	if c.httpClient != nil {
-		c.httpClient.Close()
 		c.httpClient = nil
 	}
 }
@@ -37,62 +35,44 @@ func (c *mockupClient) Execute(params ...RequestParam) (*Response, error) {
 		return nil, err
 	}
 
-	anthropicMessageParams := Message{
+	//b1, err := json.Marshal(string(b))
+	//fmt.Println(string(b1))
+
+	var full strings.Builder
+	req := ollama.Request{
 		Model:  c.options.Model,
-		Stream: false,
 		Prompt: string(b),
+		OnJson: func(res ollama.Response) error {
+			// log.Info().Msg(semLogContext + " - on json")
+			if res.Response != nil {
+				full.WriteString(*res.Response)
+			}
+			return nil
+		},
+		Options: &ollama.RequestOptions{
+			NumContext: new(100000),
+		},
 	}
 
-	bodyJson, err := json.Marshal(anthropicMessageParams)
+	err = c.httpClient.Query(req)
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
 		return nil, err
 	}
 
-	urlBuilder := har.UrlBuilder{}
-	urlBuilder.WithScheme(c.cfg.HttpScheme)
-	urlBuilder.WithHostname(c.cfg.HostName)
-	urlBuilder.WithPort(c.cfg.ServerPort)
-	urlBuilder.WithPath(c.cfg.Endpoint)
+	text := full.String()
+	fmt.Println(text)
+	if len(text) == 0 {
+		err = errors.New("no response content")
+		log.Error().Err(err).Msg(semLogContext)
+		return nil, err
+	}
 
-	reqHeaders := []har.NameValuePair{{Name: "Content-type", Value: "application/json"}, {Name: "Accept", Value: "application/json"}}
-	request, err := c.httpClient.NewRequest(http.MethodPost, urlBuilder.Url(), bodyJson, reqHeaders, nil)
+	parsedPrompt, err := c.options.Prompt.ParseTextContent(full.String())
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
 		return nil, err
 	}
 
-	harEntry, err := c.httpClient.Execute(request)
-	if err != nil {
-		log.Error().Err(err).Msg(semLogContext)
-		return nil, err
-	}
-
-	if harEntry != nil && harEntry.Response != nil {
-		if harEntry.Response.Status == http.StatusOK {
-			var msg NonStreamedResponse
-			err = json.Unmarshal(harEntry.Response.Content.Data, &msg)
-			if err != nil {
-				log.Error().Err(err).Msg(semLogContext)
-				return nil, err
-			}
-
-			resp, err := msg.RetrieveContentFromResponse(c.options.Prompt)
-			if err != nil {
-				log.Error().Err(err).Msg(semLogContext)
-				return nil, err
-			}
-
-			return &Response{Content: resp}, nil
-		} else {
-			if harEntry.Response.Content != nil && len(harEntry.Response.Content.Data) > 0 {
-				return nil, fmt.Errorf("[%d] - %s", harEntry.Response.Status, string(harEntry.Response.Content.Data))
-			}
-
-			return nil, fmt.Errorf("[%d] - %s", harEntry.Response.Status, "no content returned")
-		}
-	}
-
-	log.Error().Msg(semLogContext + " - no response content")
-	return nil, nil
+	return &Response{Content: parsedPrompt}, nil
 }

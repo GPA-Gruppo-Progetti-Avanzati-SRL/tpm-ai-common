@@ -1,13 +1,12 @@
 package ollamalks
 
 import (
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-client/restclient"
+	"github.com/eslider/go-ollama"
 	"github.com/rs/zerolog/log"
 )
 
 type LinkedService struct {
-	Cfg           *Config
-	httpClientLks *restclient.LinkedService
+	Cfg *Config
 }
 
 var theLks LinkedService
@@ -38,10 +37,6 @@ func newInstanceWithConfig(cfg *Config) (LinkedService, error) {
 	cfg.ClientOptions = DefaultClientOptions(cfg.ClientOptions)
 	lks := LinkedService{Cfg: cfg}
 
-	if cfg.Mockup != nil && cfg.Mockup.Enabled {
-		lks.httpClientLks, err = restclient.NewInstanceWithConfig(cfg.Mockup.HtttpClient)
-	}
-
 	return lks, err
 }
 
@@ -62,11 +57,10 @@ func (lks *LinkedService) NewClient(opts ...ClientOption) (Client, error) {
 		o(&options)
 	}
 
-	httpCli, err := lks.httpClientLks.NewClient()
-	if err != nil {
-		log.Error().Err(err).Msg(semLogContext)
-		return nil, err
-	}
+	client := ollama.NewOpenWebUiClient(&ollama.DSN{
+		URL:   lks.Cfg.Url,
+		Token: lks.Cfg.Token,
+	})
 
-	return &mockupClient{cfg: lks.Cfg.Mockup, httpClient: httpCli, options: options}, nil
+	return &mockupClient{cfg: lks.Cfg.Mockup, httpClient: client, options: options}, nil
 }

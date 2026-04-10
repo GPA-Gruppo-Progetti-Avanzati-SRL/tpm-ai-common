@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/ollamalks"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/prompts"
@@ -19,16 +18,8 @@ var cobExample []byte
 func TestClient(t *testing.T) {
 
 	cfg := &ollamalks.Config{
-		ApiKey:         "",
-		MaxRetries:     0,
-		RequestTimeout: time.Second * 120,
-		Mockup: &ollamalks.MockupConfig{
-			Enabled:    true,
-			HostName:   "localhost",
-			ServerPort: 11434,
-			HttpScheme: "http",
-			Endpoint:   "/api/generate",
-		},
+		Token:         "",
+		Url:           "http://localhost:11434/api/generate",
 		Verbose:       true,
 		ClientOptions: ollamalks.ClientOptions{},
 	}
