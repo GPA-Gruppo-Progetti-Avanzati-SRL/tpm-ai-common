@@ -28,7 +28,7 @@ const (
 
 func TestMain(m *testing.M) {
 
-	err := prompts.NewPromptsRegistry(TemplatesRootFolder, templates)
+	err := prompts.NewPromptsEmbeddedRegistry(TemplatesRootFolder, templates)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create registry")
 	}

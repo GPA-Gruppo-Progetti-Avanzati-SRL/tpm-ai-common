@@ -16,6 +16,6 @@ const (
 )
 
 func TestRegistry(t *testing.T) {
-	err := prompts.NewPromptsRegistry(TemplatesRootFolder, templates)
+	err := prompts.NewPromptsEmbeddedRegistry(TemplatesRootFolder, templates)
 	require.NoError(t, err)
 }

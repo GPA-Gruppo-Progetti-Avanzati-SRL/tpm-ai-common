@@ -7,7 +7,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const semLogContextBase = "anthropic-lks::"
+const (
+	semLogContextBase = "anthropic-lks::"
+	LinkedServiceType = "claude"
+)
 
 type LinkedService struct {
 	Cfg           *Config

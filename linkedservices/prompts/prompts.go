@@ -198,7 +198,7 @@ func (p PromptTemplate) ParseTextContent(text string) (map[string]MessagePart, e
 	parsedPrompt := make(map[string]MessagePart)
 	for _, s := range p.Sections {
 		if data, ok := content[s.Name]; ok {
-			parsedPrompt[s.Name] = MessagePart{Name: s.Name, Ext: s.Ext, IsSummary: s.IsSummary, Data: []byte(data)}
+			parsedPrompt[s.Name] = MessagePart{Name: s.Name, Ext: s.Ext, Ct: s.Ct, IsSummary: s.IsSummary, Data: []byte(data)}
 		} else if s.Required {
 			err = fmt.Errorf("required section %s not found in prompt %s response", s.Name, p.Name)
 			return nil, err

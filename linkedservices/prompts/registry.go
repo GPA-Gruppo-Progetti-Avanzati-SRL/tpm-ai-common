@@ -3,6 +3,7 @@ package prompts
 import (
 	"embed"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-common/util/fileutil"
@@ -19,8 +20,80 @@ type Registry struct {
 
 var theRegistry Registry
 
-func NewPromptsRegistry(rootFolder string, embeddedTemplates embed.FS) error {
+func NewPromptsRegistry(fld string) error {
 	const semLogContext = semLogContextBasePromptRegistry + "new"
+
+	fs, err := fileutil.FindFiles(fld,
+		fileutil.WithFindOptionNavigateSubDirs(),
+		fileutil.WithFindFileType(fileutil.FileTypeFile),
+		fileutil.WithFindOptionExcludeRootFolderInNames(),
+	)
+	if err != nil {
+		log.Error().Err(err).Msg(semLogContext)
+		return err
+	}
+
+	theRegistry = Registry{
+		prompts:    make(map[string]PromptTemplate, len(fs)),
+		categories: make(map[string]Category, len(fs)),
+	}
+	for _, fn := range fs {
+
+		switch {
+		case strings.HasPrefix(fn, "categories"):
+			err = addCategory(fn)
+		case strings.HasSuffix(fn, ".yml"):
+			err = addPrompt(fn)
+		}
+		if err != nil {
+			log.Error().Err(err).Str("fn", fn).Msg(semLogContext)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func addCategory(fn string) error {
+	const semLogContext = semLogContextBasePromptRegistry + "add-category"
+
+	content, err := os.ReadFile(fn)
+	if err != nil {
+		log.Error().Err(err).Str("fn", fn).Msg(semLogContext)
+		return err
+	}
+
+	var cat []Category
+	err = yaml.Unmarshal(content, &cat)
+	if err != nil {
+		log.Error().Err(err).Str("fn", fn).Msg(semLogContext + " failed to unmarshal prompt template")
+		return err
+	}
+
+	for _, c := range cat {
+		theRegistry.categories[c.Name] = c
+	}
+
+	log.Info().Str("fn", fn).Msg(semLogContext + " category loaded")
+	return nil
+}
+
+func addPrompt(fn string) error {
+	const semLogContext = semLogContextBasePromptRegistry + "add-prompt"
+
+	prmpt, err := NewPrompt(fn)
+	if err != nil {
+		log.Error().Err(err).Str("fn", fn).Msg(semLogContext + " failed to unmarshal prompt template")
+		return err
+	}
+
+	theRegistry.prompts[prmpt.Name] = prmpt
+	log.Info().Str("fn", fn).Msg(semLogContext + " prompt template loaded")
+	return nil
+}
+
+func NewPromptsEmbeddedRegistry(rootFolder string, embeddedTemplates embed.FS) error {
+	const semLogContext = semLogContextBasePromptRegistry + "new-embedded"
 
 	fs, err := fileutil.FindEmbeddedFiles(embeddedTemplates, rootFolder,
 		fileutil.WithFindOptionNavigateSubDirs(),
@@ -40,9 +113,9 @@ func NewPromptsRegistry(rootFolder string, embeddedTemplates embed.FS) error {
 		fn := ff.Info.Name()
 		switch {
 		case strings.HasPrefix(fn, "categories"):
-			err = addCategory(rootFolder, embeddedTemplates, fn, ff.Content)
+			err = addEmbeddedCategory(rootFolder, embeddedTemplates, fn, ff.Content)
 		case strings.HasSuffix(fn, ".yml"):
-			err = addPrompt(rootFolder, embeddedTemplates, fn, ff.Content)
+			err = addEmbeddedPrompt(rootFolder, embeddedTemplates, fn, ff.Content)
 		}
 		if err != nil {
 			log.Error().Err(err).Str("fn", fn).Msg(semLogContext)
@@ -53,8 +126,8 @@ func NewPromptsRegistry(rootFolder string, embeddedTemplates embed.FS) error {
 	return nil
 }
 
-func addCategory(rootFolder string, embeddedTemplates embed.FS, fn string, fileContent []byte) error {
-	const semLogContext = semLogContextBasePromptRegistry + "add-category"
+func addEmbeddedCategory(rootFolder string, embeddedTemplates embed.FS, fn string, fileContent []byte) error {
+	const semLogContext = semLogContextBasePromptRegistry + "add-embedded-category"
 	var cat []Category
 	err := yaml.Unmarshal(fileContent, &cat)
 	if err != nil {
@@ -70,8 +143,8 @@ func addCategory(rootFolder string, embeddedTemplates embed.FS, fn string, fileC
 	return nil
 }
 
-func addPrompt(rootFolder string, embeddedTemplates embed.FS, fn string, fileContent []byte) error {
-	const semLogContext = semLogContextBasePromptRegistry + "add-prompt"
+func addEmbeddedPrompt(rootFolder string, embeddedTemplates embed.FS, fn string, fileContent []byte) error {
+	const semLogContext = semLogContextBasePromptRegistry + "add-embedded-prompt"
 
 	prmpt, err := NewPromptFromEmbeddedFS(rootFolder, embeddedTemplates, fn, fileContent)
 	if err != nil {

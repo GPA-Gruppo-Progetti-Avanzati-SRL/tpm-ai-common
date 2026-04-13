@@ -8,7 +8,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const semLogContextBaseLks = "ollama-lks::"
+const (
+	semLogContextBaseLks = "ollama-lks::"
+	LinkedServiceType    = "ollama"
+)
 
 type LinkedService struct {
 	Cfg *Config
