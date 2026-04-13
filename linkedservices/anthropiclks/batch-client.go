@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/prompts"
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/rs/zerolog/log"
 )
@@ -11,7 +12,6 @@ import (
 type batchClientImpl struct {
 	verbose   bool
 	apiClient anthropic.Client
-	options   ClientOptions
 }
 
 func (c *batchClientImpl) Close() {}
@@ -21,12 +21,17 @@ func (c *batchClientImpl) SubmitBatch(requests []BatchRequest) (string, error) {
 
 	batchRequests := make([]anthropic.MessageBatchNewParamsRequest, 0, len(requests))
 	for _, req := range requests {
+
+		if _, _, _, ok := req.CustomIdWellFormed(); !ok {
+			return "", fmt.Errorf("custom-id is not well formed")
+		}
+
 		r := Request{}
 		for _, p := range req.Params {
 			p(&r)
 		}
 
-		b, err := c.options.Prompt.Text(r.TextVariables())
+		b, err := r.Prompt.Text(r.TextVariables())
 		if err != nil {
 			log.Error().Err(err).Str("custom-id", req.CustomID).Msg(semLogContext)
 			return "", err
@@ -35,13 +40,13 @@ func (c *batchClientImpl) SubmitBatch(requests []BatchRequest) (string, error) {
 		batchRequests = append(batchRequests, anthropic.MessageBatchNewParamsRequest{
 			CustomID: req.CustomID,
 			Params: anthropic.MessageBatchNewParamsRequestParams{
-				MaxTokens:   c.options.MaxTokens,
-				Temperature: anthropic.Float(c.options.Temperature),
-				System:      []anthropic.TextBlockParam{{Text: c.options.Prompt.System}},
+				MaxTokens:   r.MaxTokens,
+				Temperature: anthropic.Float(r.Temperature),
+				System:      []anthropic.TextBlockParam{{Text: r.Prompt.System}},
 				Messages: []anthropic.MessageParam{
 					anthropic.NewUserMessage(anthropic.NewTextBlock(string(b))),
 				},
-				Model: c.options.Model,
+				Model: r.Model,
 			},
 		})
 	}
@@ -108,12 +113,25 @@ func (c *batchClientImpl) GetBatchResults(batchID string) ([]BatchResult, error)
 			fmt.Println("-------------------")
 		}
 
+		var promptName string
+		var ok bool
+		if _, _, promptName, ok = BatchRequestCustomIdWellFormed(item.CustomID); !ok {
+			return nil, fmt.Errorf("custom-id is not well formed")
+		}
+
+		prompt, err := prompts.GetPrompt(promptName)
+		if err != nil {
+			logError(err).Msg(semLogContext)
+			return nil, err
+
+		}
+
 		br := BatchResult{CustomID: item.CustomID}
 
 		switch item.Result.Type {
 		case "succeeded":
 			succeeded := item.Result.AsSucceeded()
-			resp, err := ParseMessage(c.options.Prompt, &succeeded.Message)
+			resp, err := ParseMessage(prompt, &succeeded.Message)
 			if err != nil {
 				log.Error().Err(err).Str("custom-id", item.CustomID).Msg(semLogContext)
 				br.Err = err

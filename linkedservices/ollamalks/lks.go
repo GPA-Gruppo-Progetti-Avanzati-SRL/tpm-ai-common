@@ -39,7 +39,6 @@ func Initialize(cfg *Config) (*LinkedService, error) {
 
 func newInstanceWithConfig(cfg *Config) (LinkedService, error) {
 	var err error
-	cfg.RequestOptions = DefaultClientOptions(cfg.RequestOptions)
 	lks := LinkedService{Cfg: cfg}
 
 	return lks, err
@@ -50,17 +49,12 @@ type Client interface {
 	Execute(params ...RequestParam) (*Response, error)
 }
 
-func NewClient(opts ...RequestOption) (Client, error) {
-	return theLks.NewClient(opts...)
+func NewClient() (Client, error) {
+	return theLks.NewClient()
 }
 
-func (lks *LinkedService) NewClient(opts ...RequestOption) (Client, error) {
+func (lks *LinkedService) NewClient() (Client, error) {
 	const semLogContext = semLogContextBaseLks + "new-client"
-
-	options := lks.Cfg.RequestOptions
-	for _, o := range opts {
-		o(&options)
-	}
 
 	u, err := url.Parse(lks.Cfg.Url)
 	if err != nil {
@@ -69,5 +63,5 @@ func (lks *LinkedService) NewClient(opts ...RequestOption) (Client, error) {
 	}
 
 	client := api.NewClient(u, http.DefaultClient)
-	return &mockupClient{cfg: lks.Cfg.Mockup, ollamaClient: client, options: options}, nil
+	return &clientImpl{ollamaClient: client, verbose: lks.Cfg.Verbose}, nil
 }

@@ -2,10 +2,33 @@ package ollamalks
 
 import (
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/prompts"
+	"github.com/rs/zerolog/log"
 )
 
+const (
+	GenerateOptionsNumContext  = "num_ctx"
+	GenerateOptionsTemperature = "temperature"
+)
+
+type GenerateOptions struct {
+	NumCtx      int     `yaml:"num_ctx,omitempty" mapstructure:"num_ctx,omitempty" json:"num_ctx,omitempty"`
+	Temperature float64 `yaml:"temperature,omitempty" mapstructure:"temperature,omitempty" json:"temperature,omitempty"`
+}
+
+func GenerateOptionsFromCategoryOptions(cat *prompts.Category) *GenerateOptions {
+	gopts := &GenerateOptions{
+		NumCtx:      cat.GetIntOption(GenerateOptionsNumContext, 0),
+		Temperature: cat.GetFloat64Option(GenerateOptionsTemperature, 0),
+	}
+
+	return gopts
+}
+
 type Request struct {
-	Vars map[string]prompts.Variable
+	Prompt          prompts.PromptTemplate      `yaml:"prompt,omitempty" mapstructure:"prompt,omitempty" json:"prompt,omitempty"`
+	Model           string                      `yaml:"model,omitempty" mapstructure:"model,omitempty" json:"model,omitempty"`
+	GenerateOptions *GenerateOptions            `yaml:"options,omitempty" mapstructure:"options,omitempty" json:"options,omitempty"`
+	Vars            map[string]prompts.Variable `yaml:"vars,omitempty" mapstructure:"vars,omitempty" json:"vars,omitempty"`
 }
 
 func (r Request) TextVariables() map[string]string {
@@ -35,6 +58,35 @@ func WithPromptInput(vt prompts.VariableType, n string, ndx int, v []byte) Reque
 			ndx = 0
 		}
 		o.Vars[n] = prompts.Variable{Name: n, Index: ndx, Ct: vt, Value: v}
+	}
+}
+
+func WithGenerateOptions(gopts *GenerateOptions) RequestParam {
+	return func(o *Request) {
+		o.GenerateOptions = gopts
+	}
+}
+
+func WithPrompt(p prompts.PromptTemplate) RequestParam {
+	return func(o *Request) {
+		o.Prompt = p
+	}
+}
+
+func WithPromptName(n string) RequestParam {
+	return func(o *Request) {
+		pt, err := prompts.GetPrompt(n)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("failed to get prompt %s", n)
+			return
+		}
+		o.Prompt = pt
+	}
+}
+
+func WithModel(n string) RequestParam {
+	return func(o *Request) {
+		o.Model = n
 	}
 }
 

@@ -7,6 +7,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const semLogContextBase = "anthropic-lks::"
+
 type LinkedService struct {
 	Cfg           *Config
 	httpClientLks *restclient.LinkedService
@@ -37,7 +39,7 @@ func Initialize(cfg *Config) (*LinkedService, error) {
 
 func newInstanceWithConfig(cfg *Config) (LinkedService, error) {
 	var err error
-	cfg.ClientOptions = DefaultClientOptions(cfg.ClientOptions)
+
 	lks := LinkedService{Cfg: cfg}
 
 	if cfg.Mockup != nil && cfg.Mockup.Enabled {
@@ -59,21 +61,16 @@ type BatchClient interface {
 	GetBatchResults(batchID string) ([]BatchResult, error)
 }
 
-func NewClient(opts ...ClientOption) (Client, error) {
-	return theLks.NewClient(opts...)
+func NewClient() (Client, error) {
+	return theLks.NewClient()
 }
 
-func NewBatchClient(opts ...ClientOption) (BatchClient, error) {
-	return theLks.NewBatchClient(opts...)
+func NewBatchClient() (BatchClient, error) {
+	return theLks.NewBatchClient()
 }
 
-func (lks *LinkedService) NewClient(opts ...ClientOption) (Client, error) {
+func (lks *LinkedService) NewClient() (Client, error) {
 	const semLogContext = "anthropic-lks-registry::new-client"
-
-	options := lks.Cfg.ClientOptions
-	for _, o := range opts {
-		o(&options)
-	}
 
 	cliOpts := []option.RequestOption{
 		option.WithAPIKey(lks.Cfg.ApiKey),
@@ -95,19 +92,14 @@ func (lks *LinkedService) NewClient(opts ...ClientOption) (Client, error) {
 			return nil, err
 		}
 
-		return &mockupClient{cfg: lks.Cfg.Mockup, httpClient: httpCli, options: options}, nil
+		return &mockupClient{cfg: lks.Cfg.Mockup, httpClient: httpCli}, nil
 	}
 	anthropicCli := anthropic.NewClient(cliOpts...)
-	return &clientImpl{verbose: lks.Cfg.Verbose, apiClient: anthropicCli, options: options}, nil
+	return &clientImpl{verbose: lks.Cfg.Verbose, apiClient: anthropicCli}, nil
 }
 
-func (lks *LinkedService) NewBatchClient(opts ...ClientOption) (BatchClient, error) {
+func (lks *LinkedService) NewBatchClient() (BatchClient, error) {
 	const semLogContext = "anthropic-lks-registry::new-batch-client"
-
-	options := lks.Cfg.ClientOptions
-	for _, o := range opts {
-		o(&options)
-	}
 
 	cliOpts := []option.RequestOption{
 		option.WithAPIKey(lks.Cfg.ApiKey),
@@ -127,9 +119,9 @@ func (lks *LinkedService) NewBatchClient(opts ...ClientOption) (BatchClient, err
 			log.Error().Err(err).Msg(semLogContext)
 			return nil, err
 		}
-		return &mockupBatchClient{cfg: lks.Cfg.Mockup, httpClient: httpCli, options: options}, nil
+		return &mockupBatchClient{cfg: lks.Cfg.Mockup, httpClient: httpCli}, nil
 	}
 
 	anthropicCli := anthropic.NewClient(cliOpts...)
-	return &batchClientImpl{verbose: lks.Cfg.Verbose, apiClient: anthropicCli, options: options}, nil
+	return &batchClientImpl{verbose: lks.Cfg.Verbose, apiClient: anthropicCli}, nil
 }

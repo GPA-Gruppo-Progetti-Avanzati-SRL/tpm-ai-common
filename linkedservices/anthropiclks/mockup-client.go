@@ -11,7 +11,6 @@ import (
 
 type mockupClient struct {
 	cfg        *MockupConfig
-	options    ClientOptions
 	httpClient *restclient.Client
 }
 
@@ -30,20 +29,20 @@ func (c *mockupClient) Execute(params ...RequestParam) (*Response, error) {
 		p(&Req)
 	}
 
-	b, err := c.options.Prompt.Text(Req.TextVariables())
+	b, err := Req.Prompt.Text(Req.TextVariables())
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
 		return nil, err
 	}
 
 	anthropicMessageParams := anthropic.MessageNewParams{
-		MaxTokens:   c.options.MaxTokens,
-		Temperature: anthropic.Float(c.options.Temperature),
-		System:      []anthropic.TextBlockParam{{Text: c.options.Prompt.System}},
+		MaxTokens:   Req.MaxTokens,
+		Temperature: anthropic.Float(Req.Temperature),
+		System:      []anthropic.TextBlockParam{{Text: Req.Prompt.System}},
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(string(b))),
 		},
-		Model: c.options.Model,
+		Model: Req.Model,
 	}
 
 	bodyJson, err := anthropicMessageParams.MarshalJSON()
@@ -79,7 +78,7 @@ func (c *mockupClient) Execute(params ...RequestParam) (*Response, error) {
 			return nil, err
 		}
 
-		resp, err := ParseMessage(c.options.Prompt, &msg)
+		resp, err := ParseMessage(Req.Prompt, &msg)
 		if err != nil {
 			log.Error().Err(err).Msg(semLogContext)
 			return nil, err

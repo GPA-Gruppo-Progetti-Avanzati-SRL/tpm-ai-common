@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "properties": {
+    "scratchpad": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "overview": {
+      "type": "string"
+    },
+    "mermaid": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "scratchpad",
+    "summary",
+    "overview",
+    "mermaid"
+  ]
+}

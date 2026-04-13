@@ -9,12 +9,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-//go:embed templates
+//go:embed prmpts_repo
 var templates embed.FS
 
 const (
-	TemplatesRootFolder  = "templates"
-	PromptProgramSummary = "program-summary-prompt"
+	TemplatesRootFolder  = "prmpts_repo"
+	PromptProgramSummary = "program-summary"
 
 	ScratchPadSection = "scratchpad"
 	OverviewSection   = "overview"
@@ -33,21 +33,21 @@ func TestMain(m *testing.M) {
 		log.Fatal().Err(err).Msg("failed to create registry")
 	}
 
-	err = prompts.RegisterPrompt(prompts.PromptTemplate{
-		Name:         PromptProgramSummary,
-		TemplateName: "program-summary-prompt.txt",
-		System:       "You are a senior Cobol developer with extensive knowledge in mainframe cobol cics programming",
-		Vars:         []string{"COBOL_SOURCE"},
-		Sections: []prompts.MessagePart{
-			{Name: ScratchPadSection, Ext: ".md", IsSummary: false, Ct: ContentTypeTextMarkdown},
-			{Name: OverviewSection, Ext: ".md", IsSummary: false, Ct: ContentTypeTextMarkdown},
-			{Name: SummarySection, Ext: ".txt", IsSummary: true, Ct: ContentTypeTextPlain},
-			{Name: MermaidSection, Ext: ".mmd", IsSummary: false, Ct: ContentTypeApplicationVndMermaid},
-		},
-	})
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to register prompt")
-	}
+	//err = prompts.RegisterPrompt(prompts.PromptTemplate{
+	//	Name:     PromptProgramSummary,
+	//	Template: "program-summary-prompt.txt",
+	//	System:   "You are a senior Cobol developer with extensive knowledge in mainframe cobol cics programming",
+	//	Vars:     []string{"COBOL_SOURCE"},
+	//	Sections: []prompts.MessagePart{
+	//		{Name: ScratchPadSection, Ext: ".md", IsSummary: false, Ct: ContentTypeTextMarkdown},
+	//		{Name: OverviewSection, Ext: ".md", IsSummary: false, Ct: ContentTypeTextMarkdown},
+	//		{Name: SummarySection, Ext: ".txt", IsSummary: true, Ct: ContentTypeTextPlain},
+	//		{Name: MermaidSection, Ext: ".mmd", IsSummary: false, Ct: ContentTypeApplicationVndMermaid},
+	//	},
+	//})
+	//if err != nil {
+	//	log.Fatal().Err(err).Msg("failed to register prompt")
+	//}
 
 	exitVal := m.Run()
 

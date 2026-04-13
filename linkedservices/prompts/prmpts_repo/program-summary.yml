@@ -1,0 +1,23 @@
+name: program-summary
+system: You are a senior Cobol developer with extensive knowledge in mainframe cobol cics programming
+vars:
+  - COBOL_SOURCE
+parts:
+  - name: scratchpad
+    ext: ".md"
+    is-summary: false
+    ct: text/markdown
+  - name: overview
+    ext: ".md"
+    is-summary: false
+    ct: text/markdown
+  - name: summary
+    ext: ".txt"
+    is-summary: true
+    ct: text/plain
+  - name: mermaid
+    ext: ".mmd"
+    is-summary: false
+    ct: application/vnd.mermaid
+template-fn: program-summary-prompt.txt
+schema-fn: program-summary-schema.json

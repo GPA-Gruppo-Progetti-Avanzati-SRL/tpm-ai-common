@@ -11,53 +11,26 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type mockupClient struct {
-	cfg          *MockupConfig
-	options      RequestOptions
+type clientImpl struct {
+	verbose      bool
 	ollamaClient *api.Client
 }
 
-func (c *mockupClient) Close() {
+func (c *clientImpl) Close() {
 	if c.ollamaClient != nil {
 		c.ollamaClient = nil
 	}
 }
 
-var schema = []byte(`
-{
-    "type": "object",
-    "properties": {
-      "scratchpad": {
-        "type": "string"
-      },
-      "summary": {
-        "type": "string"
-      },
-      "overview": {
-        "type": "string"
-      },
-      "mermaid": {
-        "type": "string"
-      },
-    },
-    "required": [
-      "scratchpad",
-      "summary", 
-      "overview",
-      "mermaid"
-    ]
-}	
-`)
-
-func (c *mockupClient) Execute(params ...RequestParam) (*Response, error) {
+func (c *clientImpl) Execute(params ...RequestParam) (*Response, error) {
 	const semLogContext = semLogContextBaseLks + "execute"
 
-	Req := Request{}
+	reqParams := Request{}
 	for _, p := range params {
-		p(&Req)
+		p(&reqParams)
 	}
 
-	b, err := c.options.Prompt.Text(Req.TextVariables())
+	b, err := reqParams.Prompt.Text(reqParams.TextVariables())
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
 		return nil, err
@@ -67,24 +40,29 @@ func (c *mockupClient) Execute(params ...RequestParam) (*Response, error) {
 	//fmt.Println(string(b1))
 
 	reqOpts := make(map[string]interface{})
-	if c.options.GenerateOptions.NumCtx > 0 {
-		reqOpts["num_ctx"] = c.options.GenerateOptions.NumCtx
+	if reqParams.GenerateOptions.NumCtx > 0 {
+		reqOpts[GenerateOptionsNumContext] = reqParams.GenerateOptions.NumCtx
 	}
-	if c.options.GenerateOptions.Temperature > 0 {
-		reqOpts["temperature"] = c.options.GenerateOptions.Temperature
+	if reqParams.GenerateOptions.Temperature > 0 {
+		reqOpts[GenerateOptionsTemperature] = reqParams.GenerateOptions.Temperature
 	}
 	if len(reqOpts) == 0 {
 		reqOpts = nil
 	}
 
+	var responseFormat json.RawMessage
+	if reqParams.Prompt.TemplateSchema != "" {
+		responseFormat = json.RawMessage(reqParams.Prompt.TemplateSchema)
+	}
+
 	req := &api.GenerateRequest{
-		Model:  c.options.Model,
+		Model:  reqParams.Model,
 		Prompt: string(b),
 
 		// set streaming to false
 		Stream:  new(bool),
 		Options: reqOpts,
-		Format:  make(json.RawMessage, 0),
+		Format:  responseFormat,
 	}
 
 	var full strings.Builder
@@ -109,7 +87,7 @@ func (c *mockupClient) Execute(params ...RequestParam) (*Response, error) {
 		return nil, err
 	}
 
-	parsedPrompt, err := c.options.Prompt.ParseTextContent(full.String())
+	parsedPrompt, err := reqParams.Prompt.ParseTextContent(full.String())
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
 		return nil, err

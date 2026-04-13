@@ -3,15 +3,20 @@ package prompts
 import (
 	"bufio"
 	"bytes"
+	"embed"
 	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path"
+	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v3"
 )
 
 const semLogContextBasePrompt = "prompt::"
@@ -26,12 +31,79 @@ type MessagePart struct {
 }
 
 type PromptTemplate struct {
-	Name         string             `yaml:"name,omitempty" mapstructure:"name,omitempty" json:"name,omitempty"`
-	System       string             `yaml:"-" mapstructure:"-" json:"-"`
-	Vars         []string           `yaml:"vars,omitempty" mapstructure:"vars,omitempty" json:"vars,omitempty"`
-	Sections     []MessagePart      `yaml:"sections,omitempty" mapstructure:"sections,omitempty" json:"sections,omitempty"`
-	TemplateName string             `yaml:"template_name,omitempty" mapstructure:"template_name,omitempty" json:"template_name,omitempty"`
-	Data         *template.Template `yaml:"-" mapstructure:"-" json:"-"`
+	Name           string             `yaml:"name,omitempty" mapstructure:"name,omitempty" json:"name,omitempty"`
+	System         string             `yaml:"system" mapstructure:"system" json:"system"`
+	Vars           []string           `yaml:"vars,omitempty" mapstructure:"vars,omitempty" json:"vars,omitempty"`
+	Sections       []MessagePart      `yaml:"parts,omitempty" mapstructure:"parts,omitempty" json:"parts,omitempty"`
+	TemplateFn     string             `yaml:"template-fn,omitempty" mapstructure:"template-fn,omitempty" json:"template-fn,omitempty"`
+	SchemaFn       string             `yaml:"schema-fn,omitempty" mapstructure:"schema-fn,omitempty" json:"schema-fn,omitempty"`
+	ParsedTemplate *template.Template `yaml:"-" mapstructure:"-" json:"-"`
+	TemplateSchema string             `yaml:"-" mapstructure:"-" json:"-"`
+}
+
+func NewPrompt(fn string) (PromptTemplate, error) {
+	const semLogContext = semLogContextBasePromptRegistry + "new-prompt"
+
+	fileContent, err := os.ReadFile(fn)
+	if err != nil {
+		log.Error().Err(err).Str("fn", fn).Msg(semLogContext)
+		return PromptTemplate{}, err
+	}
+
+	var prmpt PromptTemplate
+	err = yaml.Unmarshal(fileContent, &prmpt)
+	if err != nil {
+		log.Error().Err(err).Str("fn", fn).Msg(semLogContext + " failed to unmarshal prompt template")
+		return PromptTemplate{}, err
+	}
+
+	tmplFn := filepath.Join(path.Dir(fn), prmpt.TemplateFn)
+	tmplBody, err := os.ReadFile(tmplFn)
+	if err != nil {
+		log.Error().Err(err).Str("path", tmplFn).Msg(semLogContext + " failed to read prompt template")
+		return PromptTemplate{}, err
+	}
+	tmpl := template.Must(template.New("").Parse(string(tmplBody)))
+	prmpt.ParsedTemplate = tmpl
+
+	if prmpt.SchemaFn != "" {
+		schemaFn := filepath.Join(path.Dir(fn), prmpt.SchemaFn)
+		schemaBody, err := os.ReadFile(schemaFn)
+		if err != nil {
+			log.Error().Err(err).Str("path", schemaFn).Msg(semLogContext + " failed to read schema template")
+			return PromptTemplate{}, err
+		}
+		prmpt.TemplateSchema = string(schemaBody)
+	}
+	return prmpt, nil
+}
+
+func NewPromptFromEmbeddedFS(rootFolder string, embeddedTemplates embed.FS, fn string, fileContent []byte) (PromptTemplate, error) {
+	const semLogContext = semLogContextBasePromptRegistry + "new-prompt-from-embedded-fs"
+	var prmpt PromptTemplate
+	err := yaml.Unmarshal(fileContent, &prmpt)
+	if err != nil {
+		log.Error().Err(err).Str("fn", fn).Msg(semLogContext + " failed to unmarshal prompt template")
+		return PromptTemplate{}, err
+	}
+
+	tmplFn := path.Join(rootFolder, path.Dir(fn), prmpt.TemplateFn)
+	tmplBody, err := embeddedTemplates.ReadFile(tmplFn)
+	if err != nil {
+		log.Error().Err(err).Str("path", tmplFn).Msg(semLogContext + " failed to read prompt template")
+		return PromptTemplate{}, err
+	}
+	tmpl := template.Must(template.New("").Parse(string(tmplBody)))
+	prmpt.ParsedTemplate = tmpl
+
+	schemaFn := path.Join(rootFolder, path.Dir(fn), prmpt.SchemaFn)
+	schemaBody, err := embeddedTemplates.ReadFile(schemaFn)
+	if err != nil {
+		log.Error().Err(err).Str("path", schemaFn).Msg(semLogContext + " failed to read schema template")
+		return PromptTemplate{}, err
+	}
+	prmpt.TemplateSchema = string(schemaBody)
+	return prmpt, nil
 }
 
 func (p PromptTemplate) SectionNames() []string {
@@ -95,7 +167,7 @@ func (p PromptTemplate) Text(vars map[string]string) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	err = p.Data.Execute(&buf, vars)
+	err = p.ParsedTemplate.Execute(&buf, vars)
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
 		return nil, err

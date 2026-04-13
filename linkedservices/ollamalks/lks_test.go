@@ -21,29 +21,28 @@ func TestClient(t *testing.T) {
 		Token:   "",
 		Url:     "http://localhost:11434",
 		Verbose: true,
-		RequestOptions: ollamalks.RequestOptions{
-			GenerateOptions: &ollamalks.GenerateOptions{
-				NumCtx: 100000,
-				// Temperature: 0.2,
-			},
-		},
 	}
 
 	lks, err := ollamalks.Initialize(cfg)
 	require.NoError(t, err)
 
-	prompt, err := prompts.GetPrompt(PromptProgramSummary)
+	cat, err := prompts.GetCategory("ollama:program-summary:granite4:latest")
 	require.NoError(t, err)
 
-	cli, err := lks.NewClient(
-		ollamalks.WithPrompt(prompt),
-		ollamalks.WithModel("granite4:latest"),
-	)
+	prompt, err := prompts.GetPrompt(cat.Prompt)
+	require.NoError(t, err)
+
+	cli, err := lks.NewClient()
 	require.NoError(t, err)
 
 	defer cli.Close()
 
-	resp, err := cli.Execute(ollamalks.WithPromptInput(prompts.TextVariable, "COBOL_SOURCE", 0, cobExample))
+	resp, err := cli.Execute(
+		ollamalks.WithPrompt(prompt),
+		ollamalks.WithPromptInput(prompts.TextVariable, "COBOL_SOURCE", 0, cobExample),
+		ollamalks.WithModel(cat.Model),
+		ollamalks.WithGenerateOptions(ollamalks.GenerateOptionsFromCategoryOptions(&cat)),
+	)
 	require.NoError(t, err)
 	require.NotEmpty(t, resp)
 

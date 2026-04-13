@@ -1,0 +1,8 @@
+- name: "ollama:program-summary:granite4:latest"
+  lks: ollama
+  model: granite4:latest
+  prompt: "program-summary"
+  options:
+    temperature: 0
+    num_ctx: 100000
+

@@ -1,13 +1,21 @@
 package anthropiclks
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/prompts"
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/rs/zerolog/log"
 )
 
 type Request struct {
-	Vars map[string]prompts.Variable
+	Vars        map[string]prompts.Variable
+	MaxTokens   int64                  `yaml:"max-tokens,omitempty" mapstructure:"max-tokens,omitempty" json:"max-tokens,omitempty"`
+	Temperature float64                `yaml:"temperature,omitempty" mapstructure:"temperature,omitempty" json:"temperature,omitempty"`
+	Prompt      prompts.PromptTemplate `yaml:"prompt,omitempty" mapstructure:"prompt,omitempty" json:"prompt,omitempty"`
+	Model       anthropic.Model        `yaml:"model,omitempty" mapstructure:"model,omitempty" json:"model,omitempty"`
 }
 
 func (r Request) TextVariables() map[string]string {
@@ -26,6 +34,56 @@ func (r Request) TextVariables() map[string]string {
 }
 
 type RequestParam func(r *Request)
+
+func WithMaxTokens(n int64) RequestParam {
+	return func(o *Request) {
+		if n > 0 {
+			o.MaxTokens = n
+		}
+	}
+}
+
+func WithTemperature(f float64) RequestParam {
+	return func(o *Request) {
+		if f < 0 {
+			f = 0
+		}
+
+		o.Temperature = f
+	}
+}
+
+func WithPrompt(p prompts.PromptTemplate) RequestParam {
+	return func(o *Request) {
+		o.Prompt = p
+	}
+}
+
+func WithPromptName(n string) RequestParam {
+	return func(o *Request) {
+		pt, err := prompts.GetPrompt(n)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("failed to get prompt %s", n)
+			return
+		}
+		o.Prompt = pt
+	}
+}
+
+func WithModel(n anthropic.Model) RequestParam {
+	return func(o *Request) {
+		o.Model = n
+	}
+}
+
+// var defCliOptions = ClientOptions{Model: anthropic.ModelClaudeOpus4_6, MaxTokens: 20000, Temperature: 0.2}
+
+//func DefaultClientOptions(opts ClientOptions) RequestParam {
+//	opts.Model = util.StringCoalesce(opts.Model, defCliOptions.Model)
+//	opts.Temperature = util.Float64Coalesce(opts.Temperature, defCliOptions.Temperature)
+//	opts.MaxTokens = util.Int64Coalesce(opts.MaxTokens, defCliOptions.MaxTokens)
+//	return opts
+//}
 
 func WithPromptInput(vt prompts.VariableType, n string, ndx int, v []byte) RequestParam {
 	return func(o *Request) {
@@ -48,6 +106,40 @@ type Response struct {
 type BatchRequest struct {
 	CustomID string
 	Params   []RequestParam
+}
+
+func (br *BatchRequest) CustomIdWellFormed() (string, string, string, bool) {
+	return BatchRequestCustomIdWellFormed(br.CustomID)
+}
+
+func BatchRequestCustomId(parts ...string) string {
+	return strings.Join(parts, "_")
+}
+
+func BatchRequestCustomIdWellFormed(customId string) (string, string, string, bool) {
+	const semLogContext = semLogContextBase + "batch-request::custom-id-well-formed"
+	if customId == "" {
+		err := fmt.Errorf("custom-id is required")
+		log.Error().Err(err).Msg(semLogContext)
+		return "", "", "", false
+	}
+
+	parts := strings.Split(customId, "_")
+	switch len(parts) {
+	case 0:
+		fallthrough
+	case 1:
+		fallthrough
+	case 2:
+		err := fmt.Errorf("custom-id must be in the format <part-1>:<part-2>:<part-3>")
+		log.Error().Err(err).Msg(semLogContext)
+		return "", "", "", false
+	case 3:
+		return parts[0], parts[1], parts[2], true
+	default:
+		return parts[0], parts[1], strings.Join(parts[2:], ":"), true
+	}
+
 }
 
 // BatchRequestCounts mirrors the per-state counters returned by the Batches API.

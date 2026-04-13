@@ -1,0 +1,103 @@
+You will be analyzing a CICS COBOL program and providing three different types of documentation for it in Italian.
+
+Here is the COBOL source code you need to analyze:
+
+<cobol_source>
+{{.COBOL_SOURCE}}
+</cobol_source>
+
+Your task is to carefully analyze this CICS COBOL program and provide three distinct outputs that document its functionality and structure.
+
+Before generating your outputs, use a scratchpad to thoroughly analyze the code. In your analysis, consider:
+
+<scratchpad>
+- What is the main purpose of this program? (e.g., transaction processing, file maintenance, report generation, batch processing, online inquiry, etc.)
+- What type of code patterns are used and what type of Cobol (pre 85, ...) is written in
+- Identify the main divisions (DATA, WORKING-STORAGE, PROCEDURE, ...) of the program with line numbers.
+- Identify the main exit point of the PROCEDURE DIVISION of program with the line number
+- What are the key CICS commands used? (e.g., EXEC CICS READ, WRITE, SEND, RECEIVE, LINK, XCTL, RETURN, etc.)
+- What data structures, copybooks, or files does it interact with?
+- What is the overall flow of the program? (initialization, main processing loop, error handling, termination)
+- What are the significant paragraphs or sections that represent major functional blocks?
+- What are the key decision points, branches, or conditional logic in the program?
+- What are the inputs to the program and what outputs does it produce?
+- Are there any database operations (VSAM, DB2, etc.)?
+- What error handling mechanisms are present?
+- the scratchpad markdown should start with a level 1 header (single '#')
+</scratchpad>
+
+Now provide your three outputs in Italian:
+
+**Output 1: Summary (Riepilogo)**
+Write a concise summary of what the program does. This summary must be:
+- Maximum 500 characters in length
+- Written in Italian
+- Focused on the primary business function or technical purpose
+- Clear and understandable to both technical and business audiences
+Place your summary inside <summary> tags.
+
+**Output 2: Functional Overview (Panoramica Funzionale)**
+Create a comprehensive functional description in markdown format, written in Italian, that covers:
+- The program's main purpose and business function
+- the type of Cobol used and code patterns found
+- a table with the identified divisions with name of division and number of starting line
+- the main exit point of the PROCEDURE DIVISION of program with the line number of statement
+- Key inputs and outputs (screens, files, databases, parameters)
+- Major processing steps or operations in sequence
+- Important CICS commands or operations used
+- Data files, databases, or resources accessed
+- Any notable error handling or special conditions
+- Transaction codes or program identifiers
+
+Use proper markdown formatting including:
+- A level 1 header (# ) as the top-level element
+- Level 2 and 3 headers for subsections
+- Bullet points for lists
+- Bold or italic text for emphasis where appropriate
+
+Place your overview inside <overview> tags.
+
+**Output 3: Mermaid Flowchart (Diagramma di Flusso)**
+Create a Mermaid flowchart diagram using the "flowchart TD" (top-down) syntax that provides a high-level view of the program's structure and flow. The diagram should:
+- Show the main entry point (program start)
+- Represent major processing blocks, paragraphs, or sections
+- Indicate key decision points and branches using diamond shapes
+- Show loops or iterative processing if present
+- Display error handling paths
+- Show the exit points (RETURN, XCTL, etc.)
+- Use appropriate Mermaid syntax for nodes, decisions, and connections
+- In the nodes do not insert any special characters  used as icons, limit to style the color of the nodes.
+- use classDef for styling nodes with the following definitions
+   - normal nodes: classDef block fill:#DAE8FC,stroke:#6C8EBF,stroke-width:2px
+   - decision nodes: classDef decision fill:#587294,stroke:#1B2330,stroke-width:2px,color:#ffffff
+   - regular start and end points: classDef startEnd fill:#D5E8D4,stroke:#82B366,stroke-width:2px
+   - error nodes: classDef err fill:#F8CECC,stroke:#B85450,stroke-width:2px
+
+Keep the diagram at a "helicopter view" level - capture the essential structure and flow without including every single line of code or minor detail. Focus on the main logical flow and major functional components.
+
+Use Italian labels for the nodes and decision points in the flowchart.
+
+Place your Mermaid diagram inside <mermaid> tags.
+
+**Important Formatting Requirements:**
+
+All three outputs must be written in Italian (Italian language).
+
+Format your complete response exactly as follows:
+
+<scratchpad>
+[Your Italian scratchpad here]
+</scratchpad>
+
+<summary>
+[Your Italian summary here, maximum 500 characters]
+</summary>
+
+<overview>
+[Your Italian markdown functional description here]
+</overview>
+
+<mermaid>
+[Your Mermaid flowchart diagram here with Italian labels]
+</mermaid>
+

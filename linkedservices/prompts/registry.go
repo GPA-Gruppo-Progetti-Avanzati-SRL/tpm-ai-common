@@ -3,17 +3,18 @@ package prompts
 import (
 	"embed"
 	"fmt"
-	"text/template"
+	"strings"
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-common/util/fileutil"
 	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v3"
 )
 
 const semLogContextBasePromptRegistry = "prompt-registry::"
 
 type Registry struct {
-	templates map[string]*template.Template
-	prompts   map[string]PromptTemplate
+	prompts    map[string]PromptTemplate
+	categories map[string]Category
 }
 
 var theRegistry Registry
@@ -32,30 +33,59 @@ func NewPromptsRegistry(rootFolder string, embeddedTemplates embed.FS) error {
 	}
 
 	theRegistry = Registry{
-		templates: make(map[string]*template.Template, len(fs)),
+		prompts:    make(map[string]PromptTemplate, len(fs)),
+		categories: make(map[string]Category, len(fs)),
 	}
 	for _, ff := range fs {
-		tmpl := template.Must(template.New("").Parse(string(ff.Content)))
-		theRegistry.templates[ff.Info.Name()] = tmpl
-		log.Info().Str("path", ff.Path).Msg(semLogContext + " prompt template loaded")
+		fn := ff.Info.Name()
+		switch {
+		case strings.HasPrefix(fn, "categories"):
+			err = addCategory(rootFolder, embeddedTemplates, fn, ff.Content)
+		case strings.HasSuffix(fn, ".yml"):
+			err = addPrompt(rootFolder, embeddedTemplates, fn, ff.Content)
+		}
+		if err != nil {
+			log.Error().Err(err).Str("fn", fn).Msg(semLogContext)
+			return err
+		}
 	}
 
 	return nil
 }
 
+func addCategory(rootFolder string, embeddedTemplates embed.FS, fn string, fileContent []byte) error {
+	const semLogContext = semLogContextBasePromptRegistry + "add-category"
+	var cat []Category
+	err := yaml.Unmarshal(fileContent, &cat)
+	if err != nil {
+		log.Error().Err(err).Str("fn", fn).Msg(semLogContext + " failed to unmarshal prompt template")
+		return err
+	}
+
+	for _, c := range cat {
+		theRegistry.categories[c.Name] = c
+	}
+
+	log.Info().Str("fn", fn).Msg(semLogContext + " category loaded")
+	return nil
+}
+
+func addPrompt(rootFolder string, embeddedTemplates embed.FS, fn string, fileContent []byte) error {
+	const semLogContext = semLogContextBasePromptRegistry + "add-prompt"
+
+	prmpt, err := NewPromptFromEmbeddedFS(rootFolder, embeddedTemplates, fn, fileContent)
+	if err != nil {
+		log.Error().Err(err).Str("fn", fn).Msg(semLogContext + " failed to unmarshal prompt template")
+		return err
+	}
+
+	theRegistry.prompts[prmpt.Name] = prmpt
+	log.Info().Str("fn", fn).Msg(semLogContext + " prompt template loaded")
+	return nil
+}
+
 func RegisterPrompt(aPrompt PromptTemplate) error {
 	const semLogContext = semLogContextBasePromptRegistry + "register-prompt"
-	var err error
-
-	if aPrompt.Data == nil {
-		var ok bool
-		aPrompt.Data, ok = theRegistry.templates[aPrompt.TemplateName]
-		if !ok {
-			err = fmt.Errorf("template %s not found", aPrompt.TemplateName)
-			log.Error().Err(err).Msg(semLogContext)
-			return err
-		}
-	}
 
 	if theRegistry.prompts == nil {
 		theRegistry.prompts = make(map[string]PromptTemplate)
@@ -75,4 +105,16 @@ func GetPrompt(name string) (PromptTemplate, error) {
 	}
 
 	return pt, nil
+}
+
+func GetCategory(name string) (Category, error) {
+	const semLogContext = semLogContextBasePromptRegistry + "get-category"
+	cat, ok := theRegistry.categories[name]
+	if !ok {
+		err := fmt.Errorf("category %s not found", name)
+		log.Error().Err(err).Msg(semLogContext)
+		return Category{}, err
+	}
+
+	return cat, nil
 }
