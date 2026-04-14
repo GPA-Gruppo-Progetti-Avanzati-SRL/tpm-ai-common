@@ -22,12 +22,12 @@ import (
 const semLogContextBasePrompt = "prompt::"
 
 type MessagePart struct {
-	Name      string `yaml:"name,omitempty" mapstructure:"name,omitempty" json:"name,omitempty"`
-	Ct        string `yaml:"ct,omitempty" mapstructure:"ct,omitempty" json:"ct,omitempty"`
-	Ext       string `yaml:"ext,omitempty" mapstructure:"ext,omitempty" json:"ext,omitempty"`
-	IsSummary bool   `yaml:"is-summary,omitempty" mapstructure:"is-summary,omitempty" json:"is-summary,omitempty"`
-	Required  bool   `yaml:"required,omitempty" mapstructure:"required,omitempty" json:"required,omitempty"`
-	Data      []byte `yaml:"-" mapstructure:"-" json:"-"`
+	Name       string `yaml:"name,omitempty" mapstructure:"name,omitempty" json:"name,omitempty"`
+	Ct         string `yaml:"ct,omitempty" mapstructure:"ct,omitempty" json:"ct,omitempty"`
+	Ext        string `yaml:"ext,omitempty" mapstructure:"ext,omitempty" json:"ext,omitempty"`
+	IsDocument bool   `yaml:"is-document,omitempty" mapstructure:"is-document,omitempty" json:"is-document,omitempty"`
+	Required   bool   `yaml:"required,omitempty" mapstructure:"required,omitempty" json:"required,omitempty"`
+	Data       []byte `yaml:"-" mapstructure:"-" json:"-"`
 }
 
 type PromptTemplate struct {
@@ -198,7 +198,7 @@ func (p PromptTemplate) ParseTextContent(text string) (map[string]MessagePart, e
 	parsedPrompt := make(map[string]MessagePart)
 	for _, s := range p.Sections {
 		if data, ok := content[s.Name]; ok {
-			parsedPrompt[s.Name] = MessagePart{Name: s.Name, Ext: s.Ext, Ct: s.Ct, IsSummary: s.IsSummary, Data: []byte(data)}
+			parsedPrompt[s.Name] = MessagePart{Name: s.Name, Ext: s.Ext, Ct: s.Ct, IsDocument: s.IsDocument, Data: []byte(data)}
 		} else if s.Required {
 			err = fmt.Errorf("required section %s not found in prompt %s response", s.Name, p.Name)
 			return nil, err

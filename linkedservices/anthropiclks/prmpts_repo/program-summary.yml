@@ -5,19 +5,19 @@ vars:
 parts:
   - name: scratchpad
     ext: ".md"
-    is-summary: false
+    is-document: true
     ct: text/markdown
   - name: overview
     ext: ".md"
-    is-summary: false
+    is-document: true
     ct: text/markdown
   - name: summary
     ext: ".txt"
-    is-summary: true
+    is-document: false
     ct: text/plain
   - name: mermaid
     ext: ".mmd"
-    is-summary: false
+    is-document: true
     ct: application/vnd.mermaid
 template-fn: program-summary-prompt.txt
 schema-fn: program-summary-schema.json
