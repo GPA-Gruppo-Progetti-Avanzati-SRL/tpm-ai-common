@@ -1,11 +1,12 @@
 package prompts
 
 type Category struct {
-	Name    string                 `yaml:"name,omitempty" mapstructure:"name,omitempty" json:"name,omitempty"`
-	Lks     string                 `yaml:"lks,omitempty" mapstructure:"lks,omitempty" json:"lks,omitempty"`
-	Model   string                 `yaml:"model,omitempty" mapstructure:"model,omitempty" json:"model,omitempty"`
-	Prompt  string                 `yaml:"prompt,omitempty" mapstructure:"prompt,omitempty" json:"prompt,omitempty"`
-	Options map[string]interface{} `yaml:"options,omitempty" mapstructure:"options,omitempty" json:"options,omitempty"`
+	Name        string                 `yaml:"name,omitempty" mapstructure:"name,omitempty" json:"name,omitempty"`
+	Lks         string                 `yaml:"lks,omitempty" mapstructure:"lks,omitempty" json:"lks,omitempty"`
+	Model       string                 `yaml:"model,omitempty" mapstructure:"model,omitempty" json:"model,omitempty"`
+	Prompt      string                 `yaml:"prompt,omitempty" mapstructure:"prompt,omitempty" json:"prompt,omitempty"`
+	Options     map[string]interface{} `yaml:"options,omitempty" mapstructure:"options,omitempty" json:"options,omitempty"`
+	HasBatchAPI bool                   `yaml:"has-batch-api,omitempty" mapstructure:"has-batch-api,omitempty" json:"has-batch-api,omitempty"`
 }
 
 func (cat Category) GetStringOption(n string, defValue string) string {
