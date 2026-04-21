@@ -137,7 +137,7 @@ func BatchRequestCustomIdWellFormed(customId string) (string, string, string, bo
 	case 3:
 		return parts[0], parts[1], parts[2], true
 	default:
-		return parts[0], parts[1], strings.Join(parts[2:], ":"), true
+		return parts[0], parts[1], strings.Join(parts[2:], "_"), true
 	}
 
 }
