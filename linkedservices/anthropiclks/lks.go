@@ -1,6 +1,7 @@
 package anthropiclks
 
 import (
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/prompts"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-client/restclient"
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -61,7 +62,7 @@ type BatchClient interface {
 	Close()
 	SubmitBatch(requests []BatchRequest) (string, error)
 	GetBatchStatus(batchID string) (*BatchStatus, error)
-	GetBatchResults(batchID string) ([]BatchResult, error)
+	GetBatchResults(batchID string, prompt prompts.PromptTemplate) ([]BatchResult, error)
 }
 
 func NewClient() (Client, error) {

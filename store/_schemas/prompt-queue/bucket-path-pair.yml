@@ -1,0 +1,7 @@
+name: BucketPathPair
+attributes:
+- name: bucket
+  type: string
+- name: path
+  type: string
+

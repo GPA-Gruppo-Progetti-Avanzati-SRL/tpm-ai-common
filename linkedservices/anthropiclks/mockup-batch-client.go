@@ -154,7 +154,7 @@ func (c *mockupBatchClient) GetBatchStatus(batchID string) (*BatchStatus, error)
 // GetBatchResults GETs {endpoint}/batches/{batchID}/results, expects a JSON
 // array of MessageBatchIndividualResponse, and parses each succeeded item
 // through the prompt template the same way Execute does.
-func (c *mockupBatchClient) GetBatchResults(batchID string) ([]BatchResult, error) {
+func (c *mockupBatchClient) GetBatchResults(batchID string, prompt prompts.PromptTemplate) ([]BatchResult, error) {
 	const semLogContext = "anthropic-lks-mockup-batch-client::get-batch-results"
 
 	urlBuilder := har.UrlBuilder{}
@@ -190,19 +190,6 @@ func (c *mockupBatchClient) GetBatchResults(batchID string) ([]BatchResult, erro
 	results := make([]BatchResult, 0, len(items))
 	for _, item := range items {
 		br := BatchResult{CustomID: item.CustomID}
-
-		var promptName string
-		var ok bool
-		if _, _, promptName, ok = BatchRequestCustomIdWellFormed(item.CustomID); !ok {
-			return nil, fmt.Errorf("custom-id is not well formed")
-		}
-
-		prompt, err := prompts.GetPrompt(promptName)
-		if err != nil {
-			logError(err).Msg(semLogContext)
-			return nil, err
-
-		}
 
 		switch item.Result.Type {
 		case "succeeded":

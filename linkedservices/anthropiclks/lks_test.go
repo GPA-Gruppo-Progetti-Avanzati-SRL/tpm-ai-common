@@ -109,7 +109,7 @@ func TestBatchClient(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	brs, err := cli.GetBatchResults(resp)
+	brs, err := cli.GetBatchResults(resp, prompt)
 	require.NoError(t, err)
 
 	for _, br := range brs {
@@ -253,7 +253,7 @@ func TestMockupBatchClient(t *testing.T) {
 	require.NoError(t, err)
 	t.Log(resp)
 
-	brs, err := cli.GetBatchResults(resp)
+	brs, err := cli.GetBatchResults(resp, prompt)
 	require.NoError(t, err)
 
 	for _, br := range brs {

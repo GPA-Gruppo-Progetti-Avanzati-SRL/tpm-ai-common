@@ -22,9 +22,11 @@ func (c *batchClientImpl) SubmitBatch(requests []BatchRequest) (string, error) {
 	batchRequests := make([]anthropic.MessageBatchNewParamsRequest, 0, len(requests))
 	for _, req := range requests {
 
-		if _, _, _, ok := req.CustomIdWellFormed(); !ok {
-			return "", fmt.Errorf("custom-id is not well formed")
-		}
+		/*
+			if _, _, _, ok := req.CustomIdWellFormed(); !ok {
+				return "", fmt.Errorf("custom-id is not well formed")
+			}
+		*/
 
 		r := Request{}
 		for _, p := range req.Params {
@@ -97,7 +99,7 @@ func (c *batchClientImpl) GetBatchStatus(batchID string) (*BatchStatus, error) {
 	}, nil
 }
 
-func (c *batchClientImpl) GetBatchResults(batchID string) ([]BatchResult, error) {
+func (c *batchClientImpl) GetBatchResults(batchID string, prompt prompts.PromptTemplate) ([]BatchResult, error) {
 	const semLogContext = "anthropic-lks-batch-client::get-batch-results"
 
 	stream := c.apiClient.Messages.Batches.ResultsStreaming(context.Background(), batchID)
@@ -111,19 +113,6 @@ func (c *batchClientImpl) GetBatchResults(batchID string) ([]BatchResult, error)
 			fmt.Println("Stream Result: -------------------")
 			fmt.Println(item.RawJSON())
 			fmt.Println("-------------------")
-		}
-
-		var promptName string
-		var ok bool
-		if _, _, promptName, ok = BatchRequestCustomIdWellFormed(item.CustomID); !ok {
-			return nil, fmt.Errorf("custom-id is not well formed")
-		}
-
-		prompt, err := prompts.GetPrompt(promptName)
-		if err != nil {
-			logError(err).Msg(semLogContext)
-			return nil, err
-
 		}
 
 		br := BatchResult{CustomID: item.CustomID}

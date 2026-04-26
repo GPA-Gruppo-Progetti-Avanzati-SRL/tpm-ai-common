@@ -1,0 +1,50 @@
+name: PromptQueueItem
+attributes:
+- name: oId
+  type: object-id
+  options: with-filter
+  tags:
+    - name: json
+      value: _id,omitempty
+    - name: bson
+      value: _id,omitempty
+    - name: yaml
+      value: _id,omitempty
+- name: domain
+  type: string
+  options: with-filter
+- name: site
+  type: string
+  options: with-filter
+- name: _bid
+  type: string
+  options: with-filter
+- name: _et
+  type: string
+  options: with-filter
+- name: category
+  type: string
+  options: with-filter
+# possible values: ready, processing, failed, completed
+- name: status
+  type: string
+  options: with-filter
+# if true, the prompt will be executed in batch mode if the linked service specified in the category supports it
+- name: batch_mode
+  type: bool
+# in case of batch mode it contains the batch id returned by the APIs
+- name: batch_id
+  type: string
+# refers to target entity or entities. bidRef.bid can be a single bid or a CSV of bids
+# bidRef.et is the entity type of all the specified bids.
+- name: bid_ref
+  type: struct
+  struct-ref:
+    name: BidEtPair
+  # Is the cardinality of bids specified in the bidRef property. Defaults to 1.
+- name: weight
+  type: int
+- name: bucketPath
+  struct-ref:
+    name: BucketPathPair
+  type: struct
