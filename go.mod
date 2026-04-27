@@ -6,7 +6,7 @@ require (
 	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-common v0.1.93
 	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-archive v0.1.27
 	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-client v0.1.27
-	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-mongo-common v1.0.9
+	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-mongo-common v1.0.11
 	github.com/anthropics/anthropic-sdk-go v1.38.0
 	github.com/ollama/ollama v0.21.2
 	github.com/rs/zerolog v1.35.1
