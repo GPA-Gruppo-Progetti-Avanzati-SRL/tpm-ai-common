@@ -22,12 +22,14 @@ import (
 const semLogContextBasePrompt = "prompt::"
 
 type MessagePart struct {
-	Name       string `yaml:"name,omitempty" mapstructure:"name,omitempty" json:"name,omitempty"`
-	Ct         string `yaml:"ct,omitempty" mapstructure:"ct,omitempty" json:"ct,omitempty"`
-	Ext        string `yaml:"ext,omitempty" mapstructure:"ext,omitempty" json:"ext,omitempty"`
-	IsDocument bool   `yaml:"is-document,omitempty" mapstructure:"is-document,omitempty" json:"is-document,omitempty"`
-	Required   bool   `yaml:"required,omitempty" mapstructure:"required,omitempty" json:"required,omitempty"`
-	Data       []byte `yaml:"-" mapstructure:"-" json:"-"`
+	Name        string `yaml:"name,omitempty" mapstructure:"name,omitempty" json:"name,omitempty"`
+	Ct          string `yaml:"ct,omitempty" mapstructure:"ct,omitempty" json:"ct,omitempty"`
+	Ext         string `yaml:"ext,omitempty" mapstructure:"ext,omitempty" json:"ext,omitempty"`
+	IsDocument  bool   `yaml:"is-document,omitempty" mapstructure:"is-document,omitempty" json:"is-document,omitempty"`
+	Required    bool   `yaml:"required,omitempty" mapstructure:"required,omitempty" json:"required,omitempty"`
+	Data        []byte `yaml:"-" mapstructure:"-" json:"-"`
+	Title       string `yaml:"title,omitempty" mapstructure:"title,omitempty" json:"title,omitempty"`
+	Description string `yaml:"description,omitempty" mapstructure:"description,omitempty" json:"description,omitempty"`
 }
 
 type PromptTemplate struct {
@@ -198,7 +200,14 @@ func (p PromptTemplate) ParseTextContent(text string) (map[string]MessagePart, e
 	parsedPrompt := make(map[string]MessagePart)
 	for _, s := range p.Sections {
 		if data, ok := content[s.Name]; ok {
-			parsedPrompt[s.Name] = MessagePart{Name: s.Name, Ext: s.Ext, Ct: s.Ct, IsDocument: s.IsDocument, Data: []byte(data)}
+			parsedPrompt[s.Name] = MessagePart{
+				Name:        s.Name,
+				Title:       s.Title,
+				Description: s.Description,
+				Ext:         s.Ext,
+				Ct:          s.Ct,
+				IsDocument:  s.IsDocument,
+				Data:        []byte(data)}
 		} else if s.Required {
 			err = fmt.Errorf("required section %s not found in prompt %s response", s.Name, p.Name)
 			return nil, err
