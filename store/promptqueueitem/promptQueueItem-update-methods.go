@@ -40,6 +40,7 @@ type UnsetOptions struct {
 	Weight      UnsetMode
 	BucketPath  UnsetMode
 	Metadata    UnsetMode
+	Singleton   UnsetMode
 }
 
 func (uo *UnsetOptions) ResolveUnsetMode(um UnsetMode) UnsetMode {
@@ -120,6 +121,11 @@ func WithMetadataUnsetMode(m UnsetMode) UnsetOption {
 		uopt.Metadata = m
 	}
 }
+func WithSingletonUnsetMode(m UnsetMode) UnsetOption {
+	return func(uopt *UnsetOptions) {
+		uopt.Singleton = m
+	}
+}
 
 type UpdateOption func(ud *UpdateDocument)
 type UpdateOptions []UpdateOption
@@ -158,6 +164,7 @@ func GetUpdateDocument(obj *PromptQueueItem, opts ...UnsetOption) UpdateDocument
 	ud.setOrUnsetWeight(obj.Weight, uo.ResolveUnsetMode(uo.Weight))
 	ud.setOrUnsetBucketPath(&obj.BucketPath, uo.ResolveUnsetMode(uo.BucketPath))
 	ud.setOrUnsetMetadata(obj.Metadata, uo.ResolveUnsetMode(uo.Metadata))
+	ud.setOrUnsetSingleton(obj.Singleton, uo.ResolveUnsetMode(uo.Singleton))
 
 	return ud
 }
@@ -749,6 +756,52 @@ func UpdateWithMetadata(p bson.M) UpdateOption {
 
 // @tpm-schematics:start-region("metadata-field-update-section")
 // @tpm-schematics:end-region("metadata-field-update-section")
+
+// SetSingleton No Remarks
+func (ud *UpdateDocument) SetSingleton(p bool) *UpdateDocument {
+	mName := fmt.Sprintf(SingletonFieldName)
+	ud.Set().Add(func() bson.E {
+		return bson.E{Key: mName, Value: p}
+	})
+	return ud
+}
+
+// UnsetSingleton No Remarks
+func (ud *UpdateDocument) UnsetSingleton() *UpdateDocument {
+	mName := fmt.Sprintf(SingletonFieldName)
+	ud.Unset().Add(func() bson.E {
+		return bson.E{Key: mName, Value: ""}
+	})
+	return ud
+}
+
+// setOrUnsetSingleton No Remarks
+func (ud *UpdateDocument) setOrUnsetSingleton(p bool, um UnsetMode) {
+	if p {
+		ud.SetSingleton(p)
+	} else {
+		switch um {
+		case KeepCurrent:
+		case UnsetData:
+			ud.UnsetSingleton()
+		case SetData2Default:
+			ud.UnsetSingleton()
+		}
+	}
+}
+
+func UpdateWithSingleton(p bool) UpdateOption {
+	return func(ud *UpdateDocument) {
+		if p {
+			ud.SetSingleton(p)
+		} else {
+			ud.UnsetSingleton()
+		}
+	}
+}
+
+// @tpm-schematics:start-region("singleton-field-update-section")
+// @tpm-schematics:end-region("singleton-field-update-section")
 
 // @tpm-schematics:start-region("bottom-file-section")
 // @tpm-schematics:end-region("bottom-file-section")
