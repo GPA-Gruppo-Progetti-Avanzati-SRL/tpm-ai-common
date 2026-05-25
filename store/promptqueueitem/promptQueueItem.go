@@ -34,6 +34,7 @@ type PromptQueueItem struct {
 	BidRef     BidEtPair      `json:"bid_ref,omitempty" bson:"bid_ref,omitempty" yaml:"bid_ref,omitempty"`
 	Weight     int32          `json:"weight,omitempty" bson:"weight,omitempty" yaml:"weight,omitempty"`
 	BucketPath BucketPathPair `json:"bucketPath,omitempty" bson:"bucketPath,omitempty" yaml:"bucketPath,omitempty"`
+	Metadata   bson.M         `json:"metadata,omitempty" bson:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	// @tpm-schematics:start-region("struct-section")
 	Count int32 `json:"count,omitempty" bson:"count,omitempty" yaml:"count,omitempty"`
@@ -41,7 +42,7 @@ type PromptQueueItem struct {
 }
 
 func (s PromptQueueItem) IsZero() bool {
-	return s.OId == bson.NilObjectID && s.Domain == "" && s.Site == "" && s.Bid == "" && s.Et == "" && s.Category == "" && s.Status == "" && !s.BatchMode && s.BatchId == "" && s.BidRef.IsZero() && s.Weight == 0 && s.BucketPath.IsZero()
+	return s.OId == bson.NilObjectID && s.Domain == "" && s.Site == "" && s.Bid == "" && s.Et == "" && s.Category == "" && s.Status == "" && !s.BatchMode && s.BatchId == "" && s.BidRef.IsZero() && s.Weight == 0 && s.BucketPath.IsZero() && len(s.Metadata) == 0
 }
 
 type QueryResult struct {

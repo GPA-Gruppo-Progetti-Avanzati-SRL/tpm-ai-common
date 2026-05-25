@@ -2,9 +2,8 @@ package promptqueueitem
 
 import (
 	"fmt"
-	"time"
-
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"time"
 )
 
 // @tpm-schematics:start-region("top-file-section")
@@ -40,6 +39,7 @@ type UnsetOptions struct {
 	BidRef      UnsetMode
 	Weight      UnsetMode
 	BucketPath  UnsetMode
+	Metadata    UnsetMode
 }
 
 func (uo *UnsetOptions) ResolveUnsetMode(um UnsetMode) UnsetMode {
@@ -115,6 +115,11 @@ func WithBucketPathUnsetMode(m UnsetMode) UnsetOption {
 		uopt.BucketPath = m
 	}
 }
+func WithMetadataUnsetMode(m UnsetMode) UnsetOption {
+	return func(uopt *UnsetOptions) {
+		uopt.Metadata = m
+	}
+}
 
 type UpdateOption func(ud *UpdateDocument)
 type UpdateOptions []UpdateOption
@@ -152,6 +157,7 @@ func GetUpdateDocument(obj *PromptQueueItem, opts ...UnsetOption) UpdateDocument
 	ud.setOrUnsetBid_ref(&obj.BidRef, uo.ResolveUnsetMode(uo.BidRef))
 	ud.setOrUnsetWeight(obj.Weight, uo.ResolveUnsetMode(uo.Weight))
 	ud.setOrUnsetBucketPath(&obj.BucketPath, uo.ResolveUnsetMode(uo.BucketPath))
+	ud.setOrUnsetMetadata(obj.Metadata, uo.ResolveUnsetMode(uo.Metadata))
 
 	return ud
 }
@@ -697,6 +703,52 @@ func UpdateWithBucketPath(p *BucketPathPair) UpdateOption {
 
 // @tpm-schematics:start-region("bucket-path-field-update-section")
 // @tpm-schematics:end-region("bucket-path-field-update-section")
+
+// SetMetadata No Remarks
+func (ud *UpdateDocument) SetMetadata(p bson.M) *UpdateDocument {
+	mName := fmt.Sprintf(MetadataFieldName)
+	ud.Set().Add(func() bson.E {
+		return bson.E{Key: mName, Value: p}
+	})
+	return ud
+}
+
+// UnsetMetadata No Remarks
+func (ud *UpdateDocument) UnsetMetadata() *UpdateDocument {
+	mName := fmt.Sprintf(MetadataFieldName)
+	ud.Unset().Add(func() bson.E {
+		return bson.E{Key: mName, Value: ""}
+	})
+	return ud
+}
+
+// setOrUnsetMetadata No Remarks
+func (ud *UpdateDocument) setOrUnsetMetadata(p bson.M, um UnsetMode) {
+	if len(p) != 0 {
+		ud.SetMetadata(p)
+	} else {
+		switch um {
+		case KeepCurrent:
+		case UnsetData:
+			ud.UnsetMetadata()
+		case SetData2Default:
+			ud.UnsetMetadata()
+		}
+	}
+}
+
+func UpdateWithMetadata(p bson.M) UpdateOption {
+	return func(ud *UpdateDocument) {
+		if len(p) != 0 {
+			ud.SetMetadata(p)
+		} else {
+			ud.UnsetMetadata()
+		}
+	}
+}
+
+// @tpm-schematics:start-region("metadata-field-update-section")
+// @tpm-schematics:end-region("metadata-field-update-section")
 
 // @tpm-schematics:start-region("bottom-file-section")
 // @tpm-schematics:end-region("bottom-file-section")

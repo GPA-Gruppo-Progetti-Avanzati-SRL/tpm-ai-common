@@ -48,3 +48,5 @@ attributes:
   struct-ref:
     name: BucketPathPair
   type: struct
+- name: metadata
+  type: document

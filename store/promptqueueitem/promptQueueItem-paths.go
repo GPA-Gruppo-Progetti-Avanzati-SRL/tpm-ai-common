@@ -24,6 +24,7 @@ const (
 	BucketPathFieldName        = "bucketPath"
 	BucketPath_BucketFieldName = "bucketPath.bucket"
 	BucketPath_PathFieldName   = "bucketPath.path"
+	MetadataFieldName          = "metadata"
 )
 
 // @tpm-schematics:start-region("bottom-file-section")
