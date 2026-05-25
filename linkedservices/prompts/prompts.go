@@ -149,7 +149,7 @@ type Variable struct {
 	Value []byte
 }
 
-func (p PromptTemplate) Text(vars map[string]string) ([]byte, error) {
+func (p PromptTemplate) Text(vars map[string]string, debugMode bool) ([]byte, error) {
 	const semLogContext = semLogContextBasePrompt + "text"
 	var err error
 
@@ -175,6 +175,11 @@ func (p PromptTemplate) Text(vars map[string]string) ([]byte, error) {
 		return nil, err
 	}
 	parsedPrompt := buf.String()
+
+	if debugMode {
+		fmt.Println(parsedPrompt)
+	}
+
 	b, err := json.Marshal(parsedPrompt)
 	return b, err
 }

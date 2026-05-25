@@ -25,7 +25,7 @@ func (c *clientImpl) Execute(params ...RequestParam) (*Response, error) {
 		p(&Req)
 	}
 
-	b, err := Req.Prompt.Text(Req.TextVariables())
+	b, err := Req.Prompt.Text(Req.TextVariables(), c.verbose)
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
 		return nil, err

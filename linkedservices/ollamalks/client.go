@@ -30,7 +30,7 @@ func (c *clientImpl) Execute(params ...RequestParam) (*Response, error) {
 		p(&reqParams)
 	}
 
-	b, err := reqParams.Prompt.Text(reqParams.TextVariables())
+	b, err := reqParams.Prompt.Text(reqParams.TextVariables(), c.verbose)
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
 		return nil, err

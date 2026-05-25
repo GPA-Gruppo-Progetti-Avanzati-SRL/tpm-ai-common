@@ -33,7 +33,7 @@ func (c *batchClientImpl) SubmitBatch(requests []BatchRequest) (string, error) {
 			p(&r)
 		}
 
-		b, err := r.Prompt.Text(r.TextVariables())
+		b, err := r.Prompt.Text(r.TextVariables(), c.verbose)
 		if err != nil {
 			log.Error().Err(err).Str("custom-id", req.CustomID).Msg(semLogContext)
 			return "", err
