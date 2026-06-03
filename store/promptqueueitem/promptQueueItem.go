@@ -1,9 +1,12 @@
 package promptqueueitem
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -83,6 +86,44 @@ func (items PromptQueueItems) ToCSVListOfObjectIds() string {
 func (ce PromptQueueItem) Log(logZeroEvt *zerolog.Event) *zerolog.Event {
 	logZeroEvt.Str("category", ce.Category).Str("status", ce.Status).Str("batch-id", ce.BatchId).Str("bid", ce.BidRef.Bid).Int32("weight", ce.Weight).Str("bucket", ce.BucketPath.String())
 	return logZeroEvt
+}
+
+func (ce PromptQueueItem) ParseMetadata() (map[string]interface{}, error) {
+	const semLogContext = semLogPackageContext + "parse-metadata"
+	if len(ce.Metadata) == 0 {
+		return nil, nil
+	}
+
+	m := make(map[string]interface{})
+	for k, v := range ce.Metadata {
+		switch vt := v.(type) {
+		case string:
+			m[k] = vt
+		case bson.A:
+			for ivv, vv := range vt {
+				switch vvt := vv.(type) {
+				case string:
+					if ivv == 0 {
+						m[k] = []string{}
+					}
+					m[k] = append(m[k].([]string), vvt)
+				case bson.D:
+					switch len(vvt) {
+					case 2:
+						if vvt[0].Key == "bucket" && vvt[1].Key == "path" {
+							m[k] = BucketPathPair{Bucket: fmt.Sprint(vvt[0].Value), Path: fmt.Sprint(vvt[1].Value)}
+						}
+					default:
+						err := errors.New("invalid metadata")
+						log.Error().Err(err).Msg(semLogContext)
+						return nil, err
+					}
+				}
+			}
+		}
+	}
+
+	return m, nil
 }
 
 // @tpm-schematics:end-region("bottom-file-section")
