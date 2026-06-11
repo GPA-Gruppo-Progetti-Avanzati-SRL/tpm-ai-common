@@ -359,4 +359,74 @@ func cursorByAggregationView(collection *mongo.Collection, f *Filter, findOption
 	return cur, nil
 }
 
+func CountByStatus(collection *mongo.Collection, f *Filter, findOptions *options.FindOptions) (CounterQueryResult, error) {
+	const semLogContext = semLogPackageContext + "count-by-status"
+	qr := CounterQueryResult{}
+
+	pipeline := mongo.Pipeline{}
+	fd := f.Build()
+	log.Trace().Str("filter", util.MustToExtendedJsonString(fd, false, false)).Msg(semLogContext)
+
+	pipeline = append(pipeline, bson.D{{"$match", fd}})
+	if findOptions != nil {
+		if findOptions.Skip != nil {
+			pipeline = append(pipeline, bson.D{{"$skip", findOptions.Skip}})
+		}
+		if findOptions.Limit != nil {
+			pipeline = append(pipeline, bson.D{{"$limit", findOptions.Limit}})
+		}
+	}
+
+	pipeline = append(pipeline,
+		bson.D{
+			{"$group",
+				bson.D{
+					{"_id",
+						bson.D{
+							{"status", "$status"},
+						},
+					},
+					{"count_1", bson.D{{"$sum", 1}}},
+				},
+			},
+		},
+		bson.D{
+			{"$project",
+				bson.D{
+					{"_id", 0},
+					{"dimension_1", "$_id.status"},
+					{"count_1", 1},
+				},
+			},
+		})
+
+	ctx := context.Background()
+
+	opts := options.Aggregate()
+	cur, err := collection.Aggregate(ctx, pipeline, opts)
+	if err != nil {
+		log.Error().Err(err).Msg(semLogContext)
+		return qr, err
+	}
+
+	for _, stage := range pipeline {
+		log.Trace().Str("filter", util.MustToExtendedJsonString(stage, true, true)).Msg(semLogContext)
+	}
+
+	for cur.Next(context.Background()) {
+		dto := Counter{}
+		err = cur.Decode(&dto)
+		if err != nil {
+			return qr, err
+		}
+
+		qr.Data = append(qr.Data, dto)
+	}
+
+	if cur.Err() != nil {
+		return qr, cur.Err()
+	}
+	return qr, nil
+}
+
 // @tpm-schematics:end-region("bottom-file-section")

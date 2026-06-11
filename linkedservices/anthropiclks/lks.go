@@ -1,6 +1,7 @@
 package anthropiclks
 
 import (
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/anthropiclks/client"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/prompts"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-client/restclient"
 	"github.com/anthropics/anthropic-sdk-go"
@@ -73,6 +74,26 @@ func NewBatchClient() (BatchClient, error) {
 	return theLks.NewBatchClient()
 }
 
+func (lks *LinkedService) NewClientNG() (*client.Client, error) {
+	const semLogContext = "anthropic-lks-registry::new-client-ng"
+
+	cliOpts := []option.RequestOption{
+		option.WithAPIKey(lks.Cfg.ApiKey),
+	}
+
+	if lks.Cfg.MaxRetries > 0 {
+		cliOpts = append(cliOpts, option.WithMaxRetries(lks.Cfg.MaxRetries))
+	}
+
+	if lks.Cfg.RequestTimeout > 0 {
+		cliOpts = append(cliOpts, option.WithRequestTimeout(lks.Cfg.RequestTimeout))
+	}
+
+	anthropicCli := anthropic.NewClient(cliOpts...)
+	c := client.New(anthropicCli)
+	return c, nil
+}
+
 func (lks *LinkedService) NewClient() (Client, error) {
 	const semLogContext = "anthropic-lks-registry::new-client"
 
@@ -80,7 +101,7 @@ func (lks *LinkedService) NewClient() (Client, error) {
 		option.WithAPIKey(lks.Cfg.ApiKey),
 	}
 
-	if lks.Cfg.RequestTimeout > 0 {
+	if lks.Cfg.MaxRetries > 0 {
 		cliOpts = append(cliOpts, option.WithMaxRetries(lks.Cfg.MaxRetries))
 	}
 
