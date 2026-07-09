@@ -158,10 +158,24 @@ func (c *Client) RunAgent(ctx context.Context, opts ...Option) (*AgentResponse, 
 			}
 		}
 
+		// Execute all tool calls and collect results before emitting the
+		// progress event, so the event can carry each tool's result. On the
+		// final turn (no tool uses) both loops are no-ops.
+		var toolResults []anthropic.ContentBlockParamUnion
+		results := make([]string, len(toolUses))
+		for i, tu := range toolUses {
+			if cfg.toolSet != nil {
+				results[i] = cfg.toolSet.Execute(tu.Name, tu.Input)
+			} else {
+				results[i] = fmt.Sprintf("ERROR: no tool executor configured for %q", tu.Name)
+			}
+			toolResults = append(toolResults, anthropic.NewToolResultBlock(tu.ID, results[i], false))
+		}
+
 		if cfg.progress != nil {
 			calls := make([]ToolCallInfo, len(toolUses))
 			for i, tu := range toolUses {
-				calls[i] = ToolCallInfo{Name: tu.Name, Input: tu.Input}
+				calls[i] = ToolCallInfo{Name: tu.Name, Input: tu.Input, Result: results[i]}
 			}
 			select {
 			case cfg.progress <- TurnEvent{
@@ -187,20 +201,9 @@ func (c *Client) RunAgent(ctx context.Context, opts ...Option) (*AgentResponse, 
 		}
 
 		// Append the assistant turn, preserving thinking blocks — the API
-		// requires them in the conversation history when thinking is active.
+		// requires them in the conversation history when thinking is active —
+		// followed by the tool results as the next user turn.
 		messages = append(messages, anthropic.NewAssistantMessage(assistantContent(resp.Content)...))
-
-		// Execute all tool calls and collect results.
-		var toolResults []anthropic.ContentBlockParamUnion
-		for _, tu := range toolUses {
-			var result string
-			if cfg.toolSet != nil {
-				result = cfg.toolSet.Execute(tu.Name, tu.Input)
-			} else {
-				result = fmt.Sprintf("ERROR: no tool executor configured for %q", tu.Name)
-			}
-			toolResults = append(toolResults, anthropic.NewToolResultBlock(tu.ID, result, false))
-		}
 		messages = append(messages, anthropic.NewUserMessage(toolResults...))
 	}
 
@@ -240,11 +243,37 @@ func buildParams(cfg config, messages []anthropic.MessageParam) anthropic.Messag
 		// Explicit form: budget_tokens (models prior to claude-opus-4-7).
 		// Temperature must be omitted when thinking is enabled (API requirement).
 		params.Thinking = anthropic.ThinkingConfigParamOfEnabled(int64(cfg.thinking))
-	} else if cfg.temperature != nil {
+	} else if cfg.temperature != nil && modelSupportsTemperature(cfg.model) {
 		params.Temperature = anthropic.Float(*cfg.temperature)
 	}
 
 	return params
+}
+
+// modelsWithoutSampling lists the model families that removed the sampling
+// parameters (temperature/top_p/top_k): sending temperature to them returns a
+// 400 "`temperature` is deprecated for this model." Matched as substrings so
+// aliases and dated snapshots (e.g. claude-opus-4-7, claude-opus-4-8@...) both
+// hit. Opus 4.6, Sonnet 4.6, Haiku 4.5, and older still accept temperature.
+var modelsWithoutSampling = []string{
+	"opus-4-7",
+	"opus-4-8",
+	"fable-5",
+	"mythos-5",
+}
+
+// modelSupportsTemperature reports whether the given model still accepts the
+// temperature parameter. When it does not, buildParams silently omits any
+// temperature the caller set via WithTemperature, so a WithTemperature call is
+// a no-op on those models rather than a request-breaking 400.
+func modelSupportsTemperature(m anthropic.Model) bool {
+	s := strings.ToLower(string(m))
+	for _, id := range modelsWithoutSampling {
+		if strings.Contains(s, id) {
+			return false
+		}
+	}
+	return true
 }
 
 // assistantContent converts a response content slice to the param union form

@@ -115,7 +115,9 @@ agent, err := c.RunAgent(ctx,
 
 `WithProgress` attaches a `chan<- TurnEvent` that `RunAgent` writes to after
 every completed turn. This lets callers log a status table, drive a TUI, or
-collect metrics without modifying the core loop.
+collect metrics without modifying the core loop. The event is emitted *after*
+the turn's tool calls have executed, so each `ToolCallInfo` carries both the
+call input and its result.
 
 ### TurnEvent fields
 
@@ -131,8 +133,9 @@ type TurnEvent struct {
 }
 
 type ToolCallInfo struct {
-    Name  string
-    Input json.RawMessage
+    Name   string
+    Input  json.RawMessage
+    Result string // tool execution output (as returned to the model)
 }
 ```
 

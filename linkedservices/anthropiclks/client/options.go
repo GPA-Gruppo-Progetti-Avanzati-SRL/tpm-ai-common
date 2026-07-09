@@ -53,7 +53,9 @@ func WithMaxTokens(n int64) Option {
 
 // WithTemperature sets the sampling temperature.
 // Ignored when WithThinking is also set (API requirement: temperature must be
-// absent when extended thinking is enabled).
+// absent when extended thinking is enabled), and ignored on models that removed
+// the sampling parameters (Opus 4.7/4.8, Fable 5, Mythos 5), where sending it
+// returns a 400 — see modelSupportsTemperature.
 func WithTemperature(f float64) Option {
 	return func(c *config) { c.temperature = &f }
 }

@@ -22,6 +22,7 @@ type TurnEvent struct {
 
 // ToolCallInfo is a summary of one tool call within a turn.
 type ToolCallInfo struct {
-	Name  string
-	Input json.RawMessage
+	Name   string
+	Input  json.RawMessage
+	Result string // tool execution output (as returned to the model)
 }
