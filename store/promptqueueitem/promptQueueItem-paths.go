@@ -26,6 +26,7 @@ const (
 	BucketPath_PathFieldName   = "bucketPath.path"
 	MetadataFieldName          = "metadata"
 	SingletonFieldName         = "singleton"
+	GroupFieldName             = "group"
 )
 
 // @tpm-schematics:start-region("bottom-file-section")

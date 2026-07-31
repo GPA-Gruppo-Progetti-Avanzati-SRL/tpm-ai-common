@@ -41,7 +41,7 @@ attributes:
   type: struct
   struct-ref:
     name: BidEtPair
-  # Is the cardinality of bids specified in the bidRef property. Defaults to 1.
+# Is the cardinality of bids specified in the bidRef property. Defaults to 1.
 - name: weight
   type: int
 - name: bucketPath
@@ -52,3 +52,7 @@ attributes:
   type: document
 - name: singleton
   type: bool
+# allows to set an id to group together the items to identify an execution context or something.
+- name: group
+  type: string
+  options: with-filter

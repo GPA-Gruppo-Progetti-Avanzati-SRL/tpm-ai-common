@@ -41,6 +41,7 @@ type UnsetOptions struct {
 	BucketPath  UnsetMode
 	Metadata    UnsetMode
 	Singleton   UnsetMode
+	Group       UnsetMode
 }
 
 func (uo *UnsetOptions) ResolveUnsetMode(um UnsetMode) UnsetMode {
@@ -126,6 +127,11 @@ func WithSingletonUnsetMode(m UnsetMode) UnsetOption {
 		uopt.Singleton = m
 	}
 }
+func WithGroupUnsetMode(m UnsetMode) UnsetOption {
+	return func(uopt *UnsetOptions) {
+		uopt.Group = m
+	}
+}
 
 type UpdateOption func(ud *UpdateDocument)
 type UpdateOptions []UpdateOption
@@ -165,6 +171,7 @@ func GetUpdateDocument(obj *PromptQueueItem, opts ...UnsetOption) UpdateDocument
 	ud.setOrUnsetBucketPath(&obj.BucketPath, uo.ResolveUnsetMode(uo.BucketPath))
 	ud.setOrUnsetMetadata(obj.Metadata, uo.ResolveUnsetMode(uo.Metadata))
 	ud.setOrUnsetSingleton(obj.Singleton, uo.ResolveUnsetMode(uo.Singleton))
+	ud.setOrUnsetGroup(obj.Group, uo.ResolveUnsetMode(uo.Group))
 
 	return ud
 }
@@ -802,6 +809,52 @@ func UpdateWithSingleton(p bool) UpdateOption {
 
 // @tpm-schematics:start-region("singleton-field-update-section")
 // @tpm-schematics:end-region("singleton-field-update-section")
+
+// SetGroup No Remarks
+func (ud *UpdateDocument) SetGroup(p string) *UpdateDocument {
+	mName := fmt.Sprintf(GroupFieldName)
+	ud.Set().Add(func() bson.E {
+		return bson.E{Key: mName, Value: p}
+	})
+	return ud
+}
+
+// UnsetGroup No Remarks
+func (ud *UpdateDocument) UnsetGroup() *UpdateDocument {
+	mName := fmt.Sprintf(GroupFieldName)
+	ud.Unset().Add(func() bson.E {
+		return bson.E{Key: mName, Value: ""}
+	})
+	return ud
+}
+
+// setOrUnsetGroup No Remarks
+func (ud *UpdateDocument) setOrUnsetGroup(p string, um UnsetMode) {
+	if p != "" {
+		ud.SetGroup(p)
+	} else {
+		switch um {
+		case KeepCurrent:
+		case UnsetData:
+			ud.UnsetGroup()
+		case SetData2Default:
+			ud.UnsetGroup()
+		}
+	}
+}
+
+func UpdateWithGroup(p string) UpdateOption {
+	return func(ud *UpdateDocument) {
+		if p != "" {
+			ud.SetGroup(p)
+		} else {
+			ud.UnsetGroup()
+		}
+	}
+}
+
+// @tpm-schematics:start-region("group-field-update-section")
+// @tpm-schematics:end-region("group-field-update-section")
 
 // @tpm-schematics:start-region("bottom-file-section")
 // @tpm-schematics:end-region("bottom-file-section")

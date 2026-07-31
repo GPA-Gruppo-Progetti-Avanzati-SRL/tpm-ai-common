@@ -307,5 +307,46 @@ func (ca *Criteria) AndStatusIn(p []string) *Criteria {
 // @tpm-schematics:start-region("status-field-filter-section")
 // @tpm-schematics:end-region("status-field-filter-section")
 
+/*
+ * filter-string template: group
+ */
+
+// AndGroupEqTo No Remarks
+func (ca *Criteria) AndGroupEqTo(p string) *Criteria {
+
+	if p == "" {
+		return ca
+	}
+
+	mName := fmt.Sprintf(GroupFieldName)
+	c := func() bson.E { return bson.E{Key: mName, Value: p} }
+	*ca = append(*ca, c)
+	return ca
+}
+
+// AndGroupIsNullOrUnset No Remarks
+func (ca *Criteria) AndGroupIsNullOrUnset() *Criteria {
+
+	mName := fmt.Sprintf(GroupFieldName)
+	c := func() bson.E { return bson.E{Key: mName, Value: nil} }
+	*ca = append(*ca, c)
+	return ca
+}
+
+func (ca *Criteria) AndGroupIn(p []string) *Criteria {
+
+	if len(p) == 0 {
+		return ca
+	}
+
+	mName := fmt.Sprintf(GroupFieldName)
+	c := func() bson.E { return bson.E{Key: mName, Value: bson.D{{"$in", p}}} }
+	*ca = append(*ca, c)
+	return ca
+}
+
+// @tpm-schematics:start-region("group-field-filter-section")
+// @tpm-schematics:end-region("group-field-filter-section")
+
 // @tpm-schematics:start-region("bottom-file-section")
 // @tpm-schematics:end-region("bottom-file-section")

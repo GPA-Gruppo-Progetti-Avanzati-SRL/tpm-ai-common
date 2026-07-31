@@ -127,6 +127,17 @@ func (c *Client) RunAgent(ctx context.Context, opts ...Option) (*AgentResponse, 
 		var resp anthropic.Message
 		for stream.Next() {
 			if err := resp.Accumulate(stream.Current()); err != nil {
+				// A turn that hits max_tokens mid tool-call leaves the tool_use
+				// input JSON truncated; Accumulate then fails to marshal it
+				// ("unexpected end of JSON input"), which crashes here before the
+				// post-stream max_tokens guard below can run. Translate it into the
+				// same actionable message instead of the opaque marshal error.
+				if strings.Contains(err.Error(), "unexpected end of JSON input") {
+					return nil, fmt.Errorf(
+						"client.RunAgent: response truncated mid tool-call on turn %d — likely hit max_tokens (%d); increase WithMaxTokens: %w",
+						turn, cfg.maxTokens, err,
+					)
+				}
 				return nil, fmt.Errorf("client.RunAgent turn %d: accumulate: %w", turn, err)
 			}
 		}

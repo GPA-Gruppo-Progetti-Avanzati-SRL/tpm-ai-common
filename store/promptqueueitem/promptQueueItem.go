@@ -1,16 +1,20 @@
 package promptqueueitem
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // @tpm-schematics:start-region("top-file-section")
+import (
+	"errors"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+)
+
 const (
 	CollectionId         = "prompt-queue-item"
 	EntityType           = "prompt-queue-item"
@@ -50,6 +54,7 @@ type PromptQueueItem struct {
 	BucketPath BucketPathPair `json:"bucketPath,omitempty" bson:"bucketPath,omitempty" yaml:"bucketPath,omitempty"`
 	Metadata   bson.M         `json:"metadata,omitempty" bson:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Singleton  bool           `json:"singleton,omitempty" bson:"singleton,omitempty" yaml:"singleton,omitempty"`
+	Group      string         `json:"group,omitempty" bson:"group,omitempty" yaml:"group,omitempty"`
 
 	// @tpm-schematics:start-region("struct-section")
 	Count int32 `json:"count,omitempty" bson:"count,omitempty" yaml:"count,omitempty"`
@@ -57,7 +62,7 @@ type PromptQueueItem struct {
 }
 
 func (s PromptQueueItem) IsZero() bool {
-	return s.OId == bson.NilObjectID && s.Domain == "" && s.Site == "" && s.Bid == "" && s.Et == "" && s.Category == "" && s.Status == "" && !s.BatchMode && s.BatchId == "" && s.BidRef.IsZero() && s.Weight == 0 && s.BucketPath.IsZero() && len(s.Metadata) == 0 && !s.Singleton
+	return s.OId == bson.NilObjectID && s.Domain == "" && s.Site == "" && s.Bid == "" && s.Et == "" && s.Category == "" && s.Status == "" && !s.BatchMode && s.BatchId == "" && s.BidRef.IsZero() && s.Weight == 0 && s.BucketPath.IsZero() && len(s.Metadata) == 0 && !s.Singleton && s.Group == ""
 }
 
 type QueryResult struct {
