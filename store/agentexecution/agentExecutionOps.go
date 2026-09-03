@@ -3,13 +3,12 @@ package agentexecution
 import (
 	"context"
 
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/cob-game/store/commons"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-mongo-common/mongolks"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-func NewAgentExecution(domain, site string, agentBid, jobId string, bidRef commons.BidTextPair, status string, weight int32, params bson.M) (*AgentExecution, error) {
+func NewAgentExecution(domain, site string, agentBid, jobId string, bidRef BidEtPair, status string, weight int32, params bson.M) (*AgentExecution, error) {
 	const semLogContext = semLogPackageContext + "new-agent-execution"
 	itemColl, err := mongolks.GetCollection(context.Background(), "default", CollectionId)
 	if err != nil {
