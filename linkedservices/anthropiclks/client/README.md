@@ -7,14 +7,16 @@ multi-turn agentic execution.
 
 ### Two entry points
 
-| Method     | When to use                                                                                    |
-|------------|------------------------------------------------------------------------------------------------|
-| `Execute`  | One API call, no tools. Returns the model's text response.                                     |
-| `RunAgent` | Streaming multi-turn loop. Executes tool calls until the model stops or `maxTurns` is reached. |
+| Method        | When to use                                                                                    |
+|---------------|------------------------------------------------------------------------------------------------|
+| `Execute`     | One API call, no tools. Returns the model's text response.                                     |
+| `RunAgent`    | Streaming multi-turn loop. Executes tool calls until the model stops or `maxTurns` is reached. |
+| `SubmitBatch` | Many single-turn requests submitted together, processed asynchronously (see [Batch API](#batch-api)). |
 
-Both methods accept the same functional-option set. Options that do not apply
-to a given method (e.g. `WithToolSet`, `WithMaxTurns`, `WithProgress` on
-`Execute`) are silently ignored.
+`Execute` and `RunAgent` accept the same functional-option set. Options that do
+not apply to a given method (e.g. `WithToolSet`, `WithMaxTurns`, `WithProgress`
+on `Execute`) are silently ignored. `SubmitBatch` reuses the same options
+per-request (see [Batch API](#batch-api)).
 
 ### Construction
 
@@ -201,5 +203,112 @@ func logTurnTable(ev client.TurnEvent) {
         ev.Duration.Seconds(),
         strings.Join(toolLabels, " · "),
     )
+}
+```
+
+---
+
+## Batch API
+
+The [Message Batches API](https://docs.anthropic.com/en/docs/build-with-claude/batch-processing)
+processes many independent, single-turn requests **asynchronously** at reduced
+cost. Instead of one blocking call per request, you submit them together, poll
+until the batch finishes, then collect the results (keyed by a caller-supplied
+`CustomID`, since results may come back out of order).
+
+Three methods cover the lifecycle:
+
+| Method                        | Role                                                                     |
+|-------------------------------|--------------------------------------------------------------------------|
+| `SubmitBatch(ctx, reqs...)`   | Submit requests; returns the created `*anthropic.MessageBatch`.           |
+| `GetBatch(ctx, batchID)`      | Fetch current state; poll its `ProcessingStatus` until `Ended`.          |
+| `CollectBatchResults(ctx, batchID)` | Stream results of a finished batch as `[]BatchResult`.              |
+
+Batches are **single-turn**: tools are ignored (there is no loop to run tool
+calls against), matching `Execute`.
+
+### Submitting
+
+Each `BatchRequest` carries a unique `CustomID` plus the *same* options
+`Execute` takes — so every request in a batch can use a different model, prompt,
+or settings. `SubmitBatch` validates that each `CustomID` is non-empty and
+unique and that each request has user content.
+
+```go
+batch, err := c.SubmitBatch(ctx,
+    client.BatchRequest{CustomID: "doc-1", Options: []client.Option{
+        client.WithSystem("Summarise."),
+        client.WithUserText(doc1),
+    }},
+    client.BatchRequest{CustomID: "doc-2", Options: []client.Option{
+        client.WithModel(anthropic.ModelClaudeOpus4_8),
+        client.WithUserText(doc2),
+    }},
+)
+// batch.ID — use it to poll and collect
+```
+
+### Polling and collecting
+
+Results are only available once processing has ended. Poll `GetBatch`, then
+collect:
+
+```go
+b, err := c.GetBatch(ctx, batch.ID)
+if err != nil { /* ... */ }
+if b.ProcessingStatus != anthropic.MessageBatchProcessingStatusEnded {
+    // not ready yet — wait and poll again
+}
+
+results, err := c.CollectBatchResults(ctx, batch.ID)
+```
+
+`CollectBatchResults` returns a non-nil error only for a transport/stream
+failure. Per-request outcomes (including failures) are reported in each
+`BatchResult`, so one bad request never sinks the whole collection.
+
+### BatchResult
+
+```go
+type BatchResult struct {
+    CustomID   string
+    Status     BatchStatus     // see below
+    Text       string          // set on success and truncation
+    StopReason string          // set on success and truncation
+    Usage      anthropic.Usage // set on success and truncation
+    Err        error           // set on every non-success status
+}
+
+func (r BatchResult) Succeeded() bool { return r.Status == BatchSucceeded }
+```
+
+`Status` flattens the SDK's result union into a single value to switch on:
+
+| Status           | Meaning                                                                      | `Text` populated? |
+|------------------|------------------------------------------------------------------------------|:-----------------:|
+| `BatchSucceeded` | Completed with a full response.                                              | ✅ |
+| `BatchTruncated` | **Synthetic** — accepted and "succeeded" per the API, but hit `max_tokens`; `Text` is the truncated output. | ✅ |
+| `BatchErrored`   | Request-level failure (e.g. invalid params).                                | — |
+| `BatchCanceled`  | Batch was canceled before this request ran.                                 | — |
+| `BatchExpired`   | Request expired before processing.                                          | — |
+
+> **Note on `max_tokens`.** The Batches API has no `max_tokens` result variant —
+> a request that hits the cap comes back as *succeeded* with an inner
+> `StopReason == "max_tokens"` and truncated content. This wrapper surfaces that
+> as the distinct `BatchTruncated` status (with `Err` set and the partial `Text`
+> preserved), keeping `max_tokens` an error condition consistent with `Execute`
+> and `RunAgent`.
+
+```go
+for _, r := range results {
+    switch r.Status {
+    case client.BatchSucceeded:
+        use(r.CustomID, r.Text)
+    case client.BatchTruncated:
+        // r.Text has the partial output; consider resubmitting with more tokens
+        log.Warn().Err(r.Err).Str("id", r.CustomID).Msg("truncated")
+    case client.BatchErrored, client.BatchCanceled, client.BatchExpired:
+        log.Error().Err(r.Err).Str("id", r.CustomID).Msg("batch request failed")
+    }
 }
 ```

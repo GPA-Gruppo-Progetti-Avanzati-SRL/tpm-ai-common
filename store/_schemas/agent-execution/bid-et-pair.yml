@@ -1,0 +1,8 @@
+name: BidEtPair
+attributes:
+- name: bid
+  type: string
+- name: et
+  type: string
+
+

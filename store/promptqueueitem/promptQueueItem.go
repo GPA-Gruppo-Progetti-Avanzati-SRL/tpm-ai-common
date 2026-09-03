@@ -22,8 +22,8 @@ const (
 
 	StatusReady      = "ready"
 	StatusProcessing = "processing"
-	StatusFailed     = "failed"
 	StatusCompleted  = "completed"
+	StatusError      = "error"
 )
 
 type Counter struct {

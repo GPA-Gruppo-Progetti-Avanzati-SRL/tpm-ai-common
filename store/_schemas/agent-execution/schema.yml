@@ -1,0 +1,9 @@
+module: github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common
+package: github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/store/agentexecution
+entities:
+- file-name: ./agent-execution.yml
+  document: true
+- file-name: ./bid-et-pair.yml
+
+# @tpm-schematics:start-region("bottom-file-section")
+# @tpm-schematics:end-region("bottom-file-section")

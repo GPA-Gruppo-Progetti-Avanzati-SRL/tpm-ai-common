@@ -224,6 +224,182 @@ func (c *Client) RunAgent(ctx context.Context, opts ...Option) (*AgentResponse, 
 	)
 }
 
+// BatchRequest is one entry in a SubmitBatch call. CustomID must be unique
+// within the batch — results come back keyed by it, possibly out of request
+// order. Options are the same per-request options accepted by Execute
+// (WithModel, WithSystem, WithUserText, WithMaxTokens, WithThinking, …), so
+// each request in a batch can use a different model, prompt, or settings.
+type BatchRequest struct {
+	CustomID string
+	Options  []Option
+}
+
+// SubmitBatch submits multiple message requests as a single Message Batch.
+//
+// The batch is processed asynchronously: this returns the created batch as soon
+// as it is accepted, not the responses. Poll c.sdk.Messages.Batches.Get with
+// the returned batch ID, and once ProcessingStatus is "ended", collect results
+// via c.sdk.Messages.Batches.ResultsStreaming — each result is keyed by the
+// CustomID supplied here.
+//
+// Tools are ignored: batch requests are single-turn (there is no loop to
+// execute tool calls against), matching Execute's behaviour.
+func (c *Client) SubmitBatch(ctx context.Context, reqs ...BatchRequest) (*anthropic.MessageBatch, error) {
+	if len(reqs) == 0 {
+		return nil, errors.New("client.SubmitBatch: at least one request is required")
+	}
+
+	apiReqs := make([]anthropic.MessageBatchNewParamsRequest, 0, len(reqs))
+	seen := make(map[string]struct{}, len(reqs))
+	for i, r := range reqs {
+		if r.CustomID == "" {
+			return nil, fmt.Errorf("client.SubmitBatch: request %d has empty CustomID", i)
+		}
+		if _, dup := seen[r.CustomID]; dup {
+			return nil, fmt.Errorf("client.SubmitBatch: duplicate CustomID %q", r.CustomID)
+		}
+		seen[r.CustomID] = struct{}{}
+
+		cfg := apply(r.Options)
+		if len(cfg.content) == 0 {
+			return nil, fmt.Errorf("client.SubmitBatch: request %q has no user content (use WithUserText or WithUserContent)", r.CustomID)
+		}
+
+		apiReqs = append(apiReqs, anthropic.MessageBatchNewParamsRequest{
+			CustomID: r.CustomID,
+			Params:   buildBatchParams(cfg),
+		})
+	}
+
+	return c.sdk.Messages.Batches.New(ctx, anthropic.MessageBatchNewParams{Requests: apiReqs})
+}
+
+// BatchStatus classifies the outcome of a single batch request. It mirrors the
+// SDK's result union variants in a form that is easy to switch on.
+type BatchStatus string
+
+const (
+	BatchSucceeded BatchStatus = "succeeded"
+	BatchErrored   BatchStatus = "errored"
+	BatchCanceled  BatchStatus = "canceled"
+	BatchExpired   BatchStatus = "expired"
+	// BatchTruncated is a synthetic status (not an API variant): the request was
+	// accepted and "succeeded", but generation hit max_tokens, so Text holds a
+	// truncated response. Surfaced distinctly to match Execute/RunAgent, which
+	// treat max_tokens as an error.
+	BatchTruncated BatchStatus = "truncated"
+)
+
+// BatchResult is the convenience form of a single batch response, keyed to the
+// CustomID supplied in the corresponding BatchRequest. It flattens the SDK's
+// result union: on success Text/StopReason/Usage are populated (mirroring
+// Response); otherwise Status says why and Err carries the reason.
+type BatchResult struct {
+	CustomID   string
+	Status     BatchStatus
+	Text       string          // populated when Status == BatchSucceeded
+	StopReason string          // populated when Status == BatchSucceeded
+	Usage      anthropic.Usage // populated when Status == BatchSucceeded
+	Err        error           // populated when Status != BatchSucceeded
+}
+
+// Succeeded reports whether the request completed with a full response.
+// A max_tokens truncation has Status BatchTruncated (not BatchSucceeded), so it
+// reports false here — matching Execute/RunAgent, which treat max_tokens as an error.
+func (r BatchResult) Succeeded() bool { return r.Status == BatchSucceeded }
+
+// GetBatch fetches the current state of a submitted batch. Inspect the returned
+// batch's ProcessingStatus — results are only available once it is
+// anthropic.MessageBatchProcessingStatusEnded.
+func (c *Client) GetBatch(ctx context.Context, batchID string) (*anthropic.MessageBatch, error) {
+	if batchID == "" {
+		return nil, errors.New("client.GetBatch: batchID is required")
+	}
+	return c.sdk.Messages.Batches.Get(ctx, batchID)
+}
+
+// CollectBatchResults streams every result of a completed batch and returns
+// them as BatchResults, one per request, keyed by CustomID.
+//
+// The batch must have finished processing (ProcessingStatus ==
+// anthropic.MessageBatchProcessingStatusEnded) — check via GetBatch first;
+// results are unavailable before then. The returned slice order follows the
+// results stream, which may differ from submission order; match by CustomID.
+//
+// A non-nil error is returned only for a transport/stream failure. Per-request
+// failures (errored/canceled/expired) are reported in each BatchResult's Status
+// and Err, not as the returned error.
+func (c *Client) CollectBatchResults(ctx context.Context, batchID string) ([]BatchResult, error) {
+	if batchID == "" {
+		return nil, errors.New("client.CollectBatchResults: batchID is required")
+	}
+
+	stream := c.sdk.Messages.Batches.ResultsStreaming(ctx, batchID)
+	defer stream.Close()
+
+	var out []BatchResult
+	for stream.Next() {
+		out = append(out, toBatchResult(stream.Current()))
+	}
+	if err := stream.Err(); err != nil {
+		return out, fmt.Errorf("client.CollectBatchResults: stream: %w", err)
+	}
+	return out, nil
+}
+
+// toBatchResult flattens one SDK individual response into a BatchResult.
+func toBatchResult(resp anthropic.MessageBatchIndividualResponse) BatchResult {
+	r := BatchResult{CustomID: resp.CustomID}
+	switch v := resp.Result.AsAny().(type) {
+	case anthropic.MessageBatchSucceededResult:
+		// The Batches API has no max_tokens result variant: a request that hits
+		// the cap comes back here as "succeeded" with StopReason == "max_tokens"
+		// and truncated content. Surface it as an error to match Execute/RunAgent,
+		// while still populating Text/Usage so callers can inspect the partial output.
+		r.Text = joinTextBlocks(v.Message.Content)
+		r.StopReason = string(v.Message.StopReason)
+		r.Usage = v.Message.Usage
+		if v.Message.StopReason == anthropic.StopReasonMaxTokens {
+			r.Status = BatchTruncated
+			r.Err = fmt.Errorf("request %q hit max_tokens — response truncated; increase WithMaxTokens", resp.CustomID)
+		} else {
+			r.Status = BatchSucceeded
+		}
+	case anthropic.MessageBatchErroredResult:
+		r.Status = BatchErrored
+		r.Err = fmt.Errorf("request %q errored: %s", resp.CustomID, v.Error.Error.Message)
+	case anthropic.MessageBatchCanceledResult:
+		r.Status = BatchCanceled
+		r.Err = fmt.Errorf("request %q was canceled", resp.CustomID)
+	case anthropic.MessageBatchExpiredResult:
+		r.Status = BatchExpired
+		r.Err = fmt.Errorf("request %q expired before processing", resp.CustomID)
+	default:
+		r.Status = BatchErrored
+		r.Err = fmt.Errorf("request %q returned an unrecognised result type", resp.CustomID)
+	}
+	return r
+}
+
+// buildBatchParams builds the per-request params for a batch entry, reusing
+// buildParams so temperature/thinking/tools handling stays defined in one place.
+// The batch request-params type mirrors MessageNewParams field-for-field, so we
+// build the standard params and copy the shared fields across.
+func buildBatchParams(cfg config) anthropic.MessageBatchNewParamsRequestParams {
+	p := buildParams(cfg, []anthropic.MessageParam{
+		anthropic.NewUserMessage(cfg.content...),
+	})
+	return anthropic.MessageBatchNewParamsRequestParams{
+		Model:        p.Model,
+		MaxTokens:    p.MaxTokens,
+		Messages:     p.Messages,
+		System:       p.System,
+		Temperature:  p.Temperature,
+		Thinking:     p.Thinking,
+		OutputConfig: p.OutputConfig,
+	}
+}
+
 // buildParams constructs MessageNewParams from cfg and the current message history.
 // Called once per turn in RunAgent; called once in Execute.
 func buildParams(cfg config, messages []anthropic.MessageParam) anthropic.MessageNewParams {

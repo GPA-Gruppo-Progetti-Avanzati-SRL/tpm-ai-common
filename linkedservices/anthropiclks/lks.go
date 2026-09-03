@@ -74,6 +74,10 @@ func NewBatchClient() (BatchClient, error) {
 	return theLks.NewBatchClient()
 }
 
+func NewClientNG() (*client.Client, error) {
+	return theLks.NewClientNG()
+}
+
 func (lks *LinkedService) NewClientNG() (*client.Client, error) {
 	const semLogContext = "anthropic-lks-registry::new-client-ng"
 
