@@ -196,7 +196,7 @@ func FindReadyPrompts(coll *mongo.Collection) ([]AgentExecution, int, error) {
 	filter := Filter{}
 	filter.Or().AndEtEqTo(EntityType).AndStatusIn([]string{StatusReady, StatusWorking})
 
-	qr, err := FindByAggregationView(coll, &filter, true, new(options.FindOptions{}))
+	qr, err := FindByAggregationView(coll, &filter, true, new(options.FindOptions))
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
 		return nil, -1, err
