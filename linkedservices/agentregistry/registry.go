@@ -1,6 +1,7 @@
 package agentregistry
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/anthropiclks/client"
@@ -11,11 +12,11 @@ const semLogContextBasePromptRegistry = "agent-registry::"
 
 type Agent interface {
 	Name() string
-	Execute(execs agentexecution.AgentExecutions) (string, error)
+	Execute(ctx context.Context, execs agentexecution.AgentExecutions) (string, error)
 	OnBatchResult(br *client.BatchResult, agentExec *agentexecution.AgentExecution) error
 }
 
-type AgentFactory func() Agent
+type AgentFactory func(domain, site string) Agent
 
 var theRegistry = map[string]AgentFactory{}
 
@@ -26,7 +27,7 @@ func AddAgent(nm string, a AgentFactory) error {
 	return nil
 }
 
-func GetAgent(n string) (Agent, error) {
+func GetAgent(domain, site, n string) (Agent, error) {
 	const semLogContext = semLogContextBasePromptRegistry + "get-agent"
 
 	af, ok := theRegistry[n]
@@ -34,5 +35,5 @@ func GetAgent(n string) (Agent, error) {
 		return nil, fmt.Errorf("no agent named %q found", n)
 	}
 
-	return af(), nil
+	return af(domain, site), nil
 }
