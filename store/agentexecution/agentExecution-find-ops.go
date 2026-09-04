@@ -210,7 +210,7 @@ func FindReadyPrompts(coll *mongo.Collection) ([]AgentExecution, int, error) {
 	var firstGroup AgentExecution
 	var firstGroupFound bool
 	for _, dto := range qr.Data {
-		if dto.Status == StatusWorking {
+		if dto.Status == StatusWorking || dto.Status == StatusStaged {
 			numProcessing += int(dto.Count)
 		} else {
 			if !firstGroupFound {
