@@ -73,7 +73,7 @@ func (c *batchClientImpl) SubmitBatch(requests []BatchRequest) (string, error) {
 func (c *batchClientImpl) GetBatchStatus(batchID string) (*BatchStatus, error) {
 	const semLogContext = "anthropic-lks-batch-client::get-batch-status"
 
-	batch, err := c.apiClient.Messages.Batches.Get(context.Background(), batchID)
+	batch, err := c.apiClient.Messages.Batches.Get(context.Background(), batchID, anthropic.MessageBatchGetParams{})
 	if err != nil {
 		logError(err).Msg(semLogContext)
 		return nil, err
@@ -102,7 +102,7 @@ func (c *batchClientImpl) GetBatchStatus(batchID string) (*BatchStatus, error) {
 func (c *batchClientImpl) GetBatchResults(batchID string, prompt prompts.PromptTemplate) ([]BatchResult, error) {
 	const semLogContext = "anthropic-lks-batch-client::get-batch-results"
 
-	stream := c.apiClient.Messages.Batches.ResultsStreaming(context.Background(), batchID)
+	stream := c.apiClient.Messages.Batches.ResultsStreaming(context.Background(), batchID, anthropic.MessageBatchResultsParams{})
 	defer stream.Close()
 
 	var results []BatchResult

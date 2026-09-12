@@ -9,16 +9,16 @@ import (
 type Option func(*config)
 
 type config struct {
-	model            anthropic.Model
-	maxTokens        int64
-	temperature      *float64 // nil means omit (required when thinking is enabled)
-	system           string
-	content          []anthropic.ContentBlockParamUnion
-	thinking         int                           // >0 = explicit budget_tokens form
-	adaptiveThinking *anthropic.OutputConfigEffort // non-nil = output_config.effort form
-	toolSet          *tools.ToolSet
-	maxTurns         int
-	progress         chan<- TurnEvent
+	model          anthropic.Model
+	maxTokens      int64
+	temperature    *float64 // nil means omit (required when thinking is enabled)
+	system         string
+	content        []anthropic.ContentBlockParamUnion
+	thinkingEffort anthropic.OutputConfigEffort // "" = no thinking; the model-independent driver
+	thinkingBudget int                          // >0 = explicit budget_tokens override for non-adaptive models; <=0 = use fallback map
+	toolSet        *tools.ToolSet
+	maxTurns       int
+	progress       chan<- TurnEvent
 }
 
 func newConfig() config {
@@ -78,27 +78,28 @@ func WithUserContent(blocks ...anthropic.ContentBlockParamUnion) Option {
 	return func(c *config) { c.content = blocks }
 }
 
-// WithThinking enables extended thinking using the explicit budget_tokens form.
-// Use for models that support this form (e.g. claude-opus-4-5 and earlier).
-// When set, temperature is automatically omitted from the request.
-// Mutually exclusive with WithAdaptiveThinking — the last one set wins.
-func WithThinking(budgetTokens int) Option {
+// WithThinking enables extended thinking. effort is the model-independent driver,
+// expressed as an output_config.effort level (low/medium/high/xhigh/max); the
+// client picks the wire form from the model:
+//
+//   - On models that support adaptive thinking (Claude 4.6 and later), effort is
+//     sent as output_config.effort. Any budget argument is ignored — the
+//     budget_tokens form returns a 400 on those models.
+//   - On older models (pre-4.6), effort is translated to the budget_tokens form.
+//     Pass an optional budget to set that value explicitly; omit it (or pass <=0)
+//     to use the built-in effort->budget fallback map. The budget is clamped to
+//     [1024, max_tokens); if max_tokens is too small to fit even the 1024 minimum,
+//     thinking is dropped (and logged) rather than sent as a request-breaking value.
+//
+// Passing an empty effort disables thinking. When thinking is enabled, temperature
+// is automatically omitted from the request.
+func WithThinking(effort anthropic.OutputConfigEffort, budget ...int) Option {
 	return func(c *config) {
-		if budgetTokens > 0 {
-			c.thinking = budgetTokens
-			c.adaptiveThinking = nil
+		c.thinkingEffort = effort
+		c.thinkingBudget = 0
+		if len(budget) > 0 && budget[0] > 0 {
+			c.thinkingBudget = budget[0]
 		}
-	}
-}
-
-// WithAdaptiveThinking enables extended thinking using the output_config.effort
-// form. Use for models that support this form (e.g. claude-opus-4-7 and later).
-// When set, temperature is automatically omitted from the request.
-// Mutually exclusive with WithThinking — the last one set wins.
-func WithAdaptiveThinking(effort anthropic.OutputConfigEffort) Option {
-	return func(c *config) {
-		c.adaptiveThinking = &effort
-		c.thinking = 0
 	}
 }
 

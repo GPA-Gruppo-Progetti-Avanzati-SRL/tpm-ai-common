@@ -38,6 +38,7 @@ import (
 	"time"
 
 	anthropic "github.com/anthropics/anthropic-sdk-go"
+	"github.com/rs/zerolog/log"
 )
 
 // Client wraps an Anthropic SDK client with an options-based execution API.
@@ -315,7 +316,7 @@ func (c *Client) GetBatch(ctx context.Context, batchID string) (*anthropic.Messa
 	if batchID == "" {
 		return nil, errors.New("client.GetBatch: batchID is required")
 	}
-	return c.sdk.Messages.Batches.Get(ctx, batchID)
+	return c.sdk.Messages.Batches.Get(ctx, batchID, anthropic.MessageBatchGetParams{})
 }
 
 // CollectBatchResults streams every result of a completed batch and returns
@@ -334,7 +335,7 @@ func (c *Client) CollectBatchResults(ctx context.Context, batchID string) ([]Bat
 		return nil, errors.New("client.CollectBatchResults: batchID is required")
 	}
 
-	stream := c.sdk.Messages.Batches.ResultsStreaming(ctx, batchID)
+	stream := c.sdk.Messages.Batches.ResultsStreaming(ctx, batchID, anthropic.MessageBatchResultsParams{})
 	defer stream.Close()
 
 	var out []BatchResult
@@ -417,24 +418,114 @@ func buildParams(cfg config, messages []anthropic.MessageParam) anthropic.Messag
 		params.Tools = cfg.toolSet.Params()
 	}
 
-	if cfg.adaptiveThinking != nil {
-		// Adaptive form: output_config.effort (e.g. claude-opus-4-7 and later).
-		// Temperature must be omitted when thinking is enabled (API requirement).
-		params.Thinking = anthropic.ThinkingConfigParamUnion{
-			OfAdaptive: &anthropic.ThinkingConfigAdaptiveParam{},
+	// Thinking is driven by cfg.thinkingEffort ("" = off). The wire form is chosen
+	// from the model: adaptive (output_config.effort) on 4.6+, budget_tokens on
+	// older models. When thinking is actually applied, temperature must be omitted
+	// (API requirement); if a requested budget can't fit max_tokens it is dropped
+	// (and logged), and temperature is then allowed to apply as normal.
+	thinkingApplied := false
+	if cfg.thinkingEffort != "" {
+		if modelSupportsAdaptiveThinking(cfg.model) {
+			// Adaptive form: output_config.effort (Claude 4.6 and later).
+			params.Thinking = anthropic.ThinkingConfigParamUnion{
+				OfAdaptive: &anthropic.ThinkingConfigAdaptiveParam{},
+			}
+			params.OutputConfig = anthropic.OutputConfigParam{Effort: cfg.thinkingEffort}
+			thinkingApplied = true
+		} else {
+			// Explicit form: budget_tokens (models prior to Claude 4.6). Use the
+			// caller-supplied budget when >0, else the effort->budget fallback map.
+			budget := cfg.thinkingBudget
+			if budget <= 0 {
+				budget = effortToBudget(cfg.thinkingEffort)
+			}
+			if b, ok := clampThinkingBudget(budget, cfg.maxTokens); ok {
+				params.Thinking = anthropic.ThinkingConfigParamOfEnabled(int64(b))
+				thinkingApplied = true
+			} else {
+				log.Warn().
+					Str("model", string(cfg.model)).
+					Str("effort", string(cfg.thinkingEffort)).
+					Int64("max-tokens", cfg.maxTokens).
+					Msg(semLogContextBuildParams + " thinking dropped: max_tokens too small to fit the budget_tokens minimum (1024) on a non-adaptive model")
+			}
 		}
-		params.OutputConfig = anthropic.OutputConfigParam{
-			Effort: *cfg.adaptiveThinking,
-		}
-	} else if cfg.thinking > 0 {
-		// Explicit form: budget_tokens (models prior to claude-opus-4-7).
-		// Temperature must be omitted when thinking is enabled (API requirement).
-		params.Thinking = anthropic.ThinkingConfigParamOfEnabled(int64(cfg.thinking))
-	} else if cfg.temperature != nil && modelSupportsTemperature(cfg.model) {
+	}
+
+	if !thinkingApplied && cfg.temperature != nil && modelSupportsTemperature(cfg.model) {
 		params.Temperature = anthropic.Float(*cfg.temperature)
 	}
 
 	return params
+}
+
+const semLogContextBuildParams = "anthropiclks-client::buildParams"
+
+// modelsWithAdaptiveThinking lists the model families that use the adaptive
+// thinking form (output_config.effort). These are Claude 4.6 and later; on them
+// the budget_tokens form is removed and returns a 400. Matched as substrings so
+// aliases and dated snapshots both hit (mirrors modelsWithoutSampling). Anything
+// not listed here (opus-4-5, sonnet-4-5, haiku-4-5, sonnet-3-7, …) uses
+// budget_tokens — note capability is family-specific, not numeric (haiku-4-5 is
+// budget-only despite the "4-5").
+var modelsWithAdaptiveThinking = []string{
+	"opus-4-6",
+	"sonnet-4-6",
+	"opus-4-7",
+	"opus-4-8",
+	"sonnet-5",
+	"opus-5",
+	"fable-5",
+	"mythos-5",
+}
+
+// modelSupportsAdaptiveThinking reports whether the model uses the adaptive
+// thinking form (output_config.effort) rather than budget_tokens.
+func modelSupportsAdaptiveThinking(m anthropic.Model) bool {
+	s := strings.ToLower(string(m))
+	for _, id := range modelsWithAdaptiveThinking {
+		if strings.Contains(s, id) {
+			return true
+		}
+	}
+	return false
+}
+
+// effortToBudget maps an effort level to an approximate budget_tokens value for
+// the non-adaptive (pre-4.6) models. Anthropic publishes no official equivalence
+// — effort is qualitative, budget_tokens is a hard count — so these are pragmatic
+// defaults, tunable and only used as a fallback when the caller passes no explicit
+// budget. Unknown/empty effort falls back to the medium value.
+func effortToBudget(effort anthropic.OutputConfigEffort) int {
+	switch effort {
+	case anthropic.OutputConfigEffortLow:
+		return 4096
+	case anthropic.OutputConfigEffortHigh:
+		return 16384
+	case anthropic.OutputConfigEffortXhigh:
+		return 24576
+	case anthropic.OutputConfigEffortMax:
+		return 32768
+	default: // medium and anything unrecognized
+		return 8192
+	}
+}
+
+// clampThinkingBudget fits a budget_tokens value into the API's constraints:
+// it must be >= 1024 and strictly < max_tokens. Returns ok=false when max_tokens
+// is too small to satisfy both (i.e. <= 1024), so the caller drops thinking.
+func clampThinkingBudget(budget int, maxTokens int64) (int, bool) {
+	const minBudget = 1024
+	if maxTokens <= minBudget {
+		return 0, false
+	}
+	if budget < minBudget {
+		budget = minBudget
+	}
+	if int64(budget) >= maxTokens {
+		budget = int(maxTokens) - 1
+	}
+	return budget, true
 }
 
 // modelsWithoutSampling lists the model families that removed the sampling
