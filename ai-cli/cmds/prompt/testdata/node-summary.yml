@@ -8,7 +8,10 @@ vars:
 xml-sections:
   - name: "overview"
     ct: text/markdown
+    ext: .md
   - name: "flowchart"
     ct: text/vnd.mermaid
+    ext: .mmd
   - name: "summary"
     ct: text/plain
+    ext: .txt

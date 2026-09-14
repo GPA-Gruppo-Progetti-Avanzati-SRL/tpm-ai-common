@@ -3,6 +3,8 @@ package prompt
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -24,7 +26,7 @@ var (
 	llmProvider          string
 	promptDefinitionFile string
 	cfgFileName          string
-	batch                bool
+	mode                 string
 	batchPollInterval    time.Duration
 	promptVars           map[string]string
 	batchid              string
@@ -58,7 +60,7 @@ var theCmd = &cobra.Command{
 			return
 		}
 
-		log.Info().Str("prompt", promptDefinitionFile).Bool("batch", batch).Msg(semLogContext)
+		log.Info().Str("prompt", promptDefinitionFile).Str("mode", mode).Msg(semLogContext)
 
 		err := doWork()
 		if err != nil {
@@ -84,27 +86,34 @@ func doWork() error {
 	}
 
 	agent := promptagent.NewAgentFactory(DefaultDomain, DefaultSite)
-	resp, err := agent.Execute(context.Background(),
-		[]agentexecution.AgentExecution{{
-			CustomID: fmt.Sprintf("REQUEST-ID-%02d", 1),
-			Domain:   DefaultDomain,
-			Site:     DefaultSite,
-			Bid:      promptagent.Name,
-			Et:       agentexecution.EntityType,
-			Status:   agentexecution.StatusWorking,
-			Weight:   0,
-			BidRef:   agentexecution.BidEtPair{},
-			Params: map[string]any{
-				promptagent.ParamModel:                model,
-				promptagent.ParamOutFolder:            outFolder,
-				promptagent.ParamLlmProvider:          llmProvider,
-				promptagent.ParamPromptDefinitionFile: promptDefinitionFile,
-				promptagent.ParamPromptVars:           promptVars,
-			},
-			Group: DefaultGroup,
-		}},
-		agents.BatchExecutionHint{BatchId: batchid, BatchPollInterval: batchPollInterval},
-	)
+	execs := []agentexecution.AgentExecution{{
+		CustomID: fmt.Sprintf("REQUEST-ID-%02d", 1),
+		Domain:   DefaultDomain,
+		Site:     DefaultSite,
+		Bid:      promptagent.Name,
+		Et:       agentexecution.EntityType,
+		Status:   agentexecution.StatusWorking,
+		Weight:   0,
+		BidRef:   agentexecution.BidEtPair{},
+		Params: map[string]any{
+			promptagent.ParamModel:                model,
+			promptagent.ParamOutFolder:            outFolder,
+			promptagent.ParamLlmProvider:          llmProvider,
+			promptagent.ParamPromptDefinitionFile: promptDefinitionFile,
+			promptagent.ParamPromptVars:           promptVars,
+		},
+		Group: DefaultGroup,
+	}}
+
+	// batch mode passes a BatchExecutionHint (which selects the async Batch API
+	// path); online mode passes no hint and runs synchronously.
+	var resp *agents.AgentResponse
+	if mode == "batch" {
+		resp, err = agent.Execute(context.Background(), execs,
+			agents.BatchExecutionHint{BatchId: batchid, BatchPollInterval: batchPollInterval})
+	} else {
+		resp, err = agent.Execute(context.Background(), execs)
+	}
 
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
@@ -112,6 +121,68 @@ func doWork() error {
 	}
 
 	log.Info().Interface("resp", resp).Msg(semLogContext)
+
+	resolvedOut, err := agentutil.ResolveFolder("out-folder", outFolder, true)
+	if err != nil {
+		return err
+	}
+
+	if err = writeResponses(resolvedOut, resp); err != nil {
+		log.Error().Err(err).Msg(semLogContext)
+		return err
+	}
+
+	return nil
+}
+
+// writeResponses persists each succeeded execution response into its own
+// subfolder "<outFolder>/<custom-id>/". For an XML-sectioned prompt every
+// extracted section is written to "<section><ext>" (using the section's declared
+// extension); for a schema/JSON (or other single-payload) prompt the full content
+// is written to a single "content" file. Non-succeeded responses are skipped.
+func writeResponses(outFolder string, resp *agents.AgentResponse) error {
+	const semLogContext = semLogContextCmd + "write-responses"
+
+	if resp == nil {
+		return nil
+	}
+
+	for _, r := range resp.Responses {
+		if r.Status != "succeeded" {
+			log.Warn().Str("custom-id", r.CustomId).Str("status", r.Status).Msg(semLogContext + " skipping non-succeeded response")
+			continue
+		}
+
+		execFolder := filepath.Join(outFolder, r.CustomId)
+		if err := os.MkdirAll(execFolder, 0o755); err != nil {
+			log.Error().Err(err).Str("folder", execFolder).Msg(semLogContext)
+			return err
+		}
+
+		if len(r.XMLSections) > 0 {
+			for _, sect := range r.XMLSections {
+				fn := filepath.Join(execFolder, sect.Name+sect.Ext)
+				if err := os.WriteFile(fn, sect.Data, 0o644); err != nil {
+					log.Error().Err(err).Str("file", fn).Msg(semLogContext)
+					return err
+				}
+				log.Info().Str("file", fn).Msg(semLogContext + " wrote section")
+			}
+			continue
+		}
+
+		// Single-payload output (schema/JSON or raw): write the full content.
+		ext := ".txt"
+		if r.Ct == agents.AgentResponseJSON {
+			ext = ".json"
+		}
+		fn := filepath.Join(execFolder, "content"+ext)
+		if err := os.WriteFile(fn, r.Content, 0o644); err != nil {
+			log.Error().Err(err).Str("file", fn).Msg(semLogContext)
+			return err
+		}
+		log.Info().Str("file", fn).Msg(semLogContext + " wrote content")
+	}
 
 	return nil
 }
@@ -123,8 +194,8 @@ func init() {
 	theCmd.Flags().StringVarP(&promptDefinitionFile, "def", "D", "", "the prompt definition file to use")
 	theCmd.Flags().VarP(newEnumValue(&llmProvider, "", "anthropic", "ollama", "vllm"), "llm", "L", "provider to use (one of: anthropic, ollama, vllm)")
 	theCmd.Flags().StringVarP(&cfgFileName, "cfg-file", "C", "", "config file of linked services")
-	theCmd.Flags().BoolVarP(&batch, "batch", "B", false, "use batch APIs if possible")
-	theCmd.Flags().StringVarP(&batchid, "resume-batch-id", "R", "", "use this to resume a batch-id from a previous run")
+	theCmd.Flags().VarP(newEnumValue(&mode, "online", "online", "batch"), "mode", "m", "execution mode (one of: online, batch); online runs synchronously, batch uses the async Batch API")
+	theCmd.Flags().StringVarP(&batchid, "resume-batch-id", "R", "", "resume a batch-id from a previous run (batch mode only)")
 	theCmd.Flags().DurationVar(&batchPollInterval, "poll-interval", 30*time.Second, "(used only with batch enabled and provider supporting it, it specifies how often to poll for batch completion; set to 0 to fire-and-forget (prints batch ID and exits)")
 	// StringToString map flag. Behavioral notes:
 	//   - Repeats merge: --var a=1 --var b=2 -> {a:1, b:2} (first use replaces the
@@ -176,6 +247,13 @@ func validateArgs() error {
 
 	cfgFileName, err = agentutil.ResolveFilename("lks-file", cfgFileName, true)
 	if err != nil {
+		return err
+	}
+
+	// resume-batch-id and poll-interval only apply to the async Batch API path.
+	if batchid != "" && mode != "batch" {
+		err = fmt.Errorf("error: --resume-batch-id is only valid with --mode batch")
+		log.Error().Err(err).Msg(semLogContext)
 		return err
 	}
 

@@ -41,12 +41,6 @@ func (a *Agent) Execute(_ context.Context, execs agentexecution.AgentExecutions,
 		return nil, err
 	}
 
-	if len(batchExecution) == 0 {
-		err = errors.New(semLogContext + " no batch executions provided, online not yet implemented")
-		log.Error().Err(err).Msg(semLogContext)
-		return nil, err
-	}
-
 	for _, exec := range execs {
 		cfg := NewConfig(exec.Params)
 		if err = cfg.Validate(); err != nil {
@@ -70,18 +64,82 @@ func (a *Agent) Execute(_ context.Context, execs agentexecution.AgentExecutions,
 		return nil, err
 	}
 
+	// No BatchExecutionHint means run synchronously (online): one immediate call
+	// per execution. A hint selects the asynchronous Batch API path.
+	if len(batchExecution) == 0 {
+		return a.executeOnline(cli)
+	}
+
+	return a.executeBatch(cli, execs, batchExecution[0])
+}
+
+// executeOnline runs one synchronous LLM call per configured execution. A single
+// execution that fails (transport error, or a max_tokens truncation surfaced as
+// an error by client.Execute) is recorded with Status "error" / Ct "none" and
+// does not abort the run; the overall AgentResponse.Status becomes "error" if
+// any execution failed.
+func (a *Agent) executeOnline(cli *client.Client) (*agents.AgentResponse, error) {
+	const semLogContext = semLogPackageContext + "execute-online"
+
+	agentResponse := &agents.AgentResponse{Status: "done"}
+	for i := range a.cfgs {
+		cfg := &a.cfgs[i]
+
+		opts, err := a.buildOptions(cfg)
+		if err != nil {
+			log.Error().Err(err).Msg(semLogContext)
+			return nil, err
+		}
+
+		out, err := cli.Execute(context.Background(), opts...)
+		if err != nil {
+			log.Error().Err(err).Str("custom-id", cfg.CustomID).Msg(semLogContext + " online execution failed")
+			agentResponse.Responses = append(agentResponse.Responses, agents.AgentExecutionResponse{
+				CustomId: cfg.CustomID,
+				Status:   "error",
+				Ct:       agents.AgentResponseNone,
+			})
+			agentResponse.Status = "error"
+			continue
+		}
+
+		resp, err := a.buildExecutionResponse(cfg, cfg.CustomID, "succeeded", out.Text)
+		if err != nil {
+			log.Error().Err(err).Str("custom-id", cfg.CustomID).Msg(semLogContext)
+			agentResponse.Responses = append(agentResponse.Responses, agents.AgentExecutionResponse{
+				CustomId: cfg.CustomID,
+				Status:   "error",
+				Ct:       agents.AgentResponseNone,
+			})
+			agentResponse.Status = "error"
+			continue
+		}
+
+		agentResponse.Responses = append(agentResponse.Responses, resp)
+	}
+
+	return agentResponse, nil
+}
+
+// executeBatch runs the executions through the asynchronous Batch API: submit (or
+// resume via hint.BatchId), poll until the batch ends, then collect and map each
+// result.
+func (a *Agent) executeBatch(cli *client.Client, execs agentexecution.AgentExecutions, batchExecution agents.BatchExecutionHint) (*agents.AgentResponse, error) {
+	const semLogContext = semLogPackageContext + "execute-batch"
+	var err error
+
 	var batchId string
-	if batchExecution[0].BatchId == "" {
+	if batchExecution.BatchId == "" {
 		batchId, _, err = a.submitBatch(cli, execs)
 		if err != nil {
 			log.Error().Err(err).Msg(semLogContext)
 			return nil, err
 		}
 	} else {
-		batchId = batchExecution[0].BatchId
+		batchId = batchExecution.BatchId
 	}
 
-	batchReady, err := a.pollBatch(cli, batchId, batchExecution[0])
+	batchReady, err := a.pollBatch(cli, batchId, batchExecution)
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
 		return nil, err
@@ -136,30 +194,39 @@ func (a *Agent) OnBatchResult(br *client.BatchResult, item *agentexecution.Agent
 		return agents.AgentExecutionResponse{CustomId: br.CustomID, Status: string(br.Status), Ct: agents.AgentResponseNone}, err
 	}
 
-	if a.cfgs[ndx].promptDefinition.HasSchemaOutput() {
+	return a.buildExecutionResponse(&a.cfgs[ndx], br.CustomID, string(br.Status), br.Text)
+}
+
+// buildExecutionResponse maps a successful model text output onto an
+// AgentExecutionResponse using the prompt definition's declared output shape: a
+// schema-output prompt yields JSON content, otherwise the XML-delimited sections
+// are extracted from the text. Shared by the batch and online paths.
+func (a *Agent) buildExecutionResponse(cfg *Config, customID, status, text string) (agents.AgentExecutionResponse, error) {
+	const semLogContext = semLogPackageContext + "build-execution-response"
+
+	if cfg.promptDefinition.HasSchemaOutput() {
 		return agents.AgentExecutionResponse{
-			CustomId:    br.CustomID,
-			Status:      string(br.Status),
-			Content:     []byte(br.Text),
+			CustomId:    customID,
+			Status:      status,
+			Content:     []byte(text),
 			Ct:          agents.AgentResponseJSON,
 			XMLSections: nil,
 		}, nil
 	}
 
-	xs, err := a.cfgs[ndx].promptDefinition.XMLSections.ExtractFromText(br.Text)
+	xs, err := cfg.promptDefinition.XMLSections.ExtractFromText(text)
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
-		return agents.AgentExecutionResponse{CustomId: br.CustomID, Status: string(br.Status)}, err
+		return agents.AgentExecutionResponse{CustomId: customID, Status: status}, err
 	}
 
 	return agents.AgentExecutionResponse{
-		CustomId:    br.CustomID,
-		Status:      string(br.Status),
-		Content:     []byte(br.Text),
+		CustomId:    customID,
+		Status:      status,
+		Content:     []byte(text),
 		Ct:          agents.AgentResponseXML,
 		XMLSections: xs,
 	}, nil
-
 }
 
 func (a *Agent) pollBatch(cli *client.Client, batchId string, batchExecutionParams agents.BatchExecutionHint) (bool, error) {
@@ -195,32 +262,19 @@ func (a *Agent) submitBatch(cli *client.Client, items agentexecution.AgentExecut
 
 	const semLogContext = semLogPackageContext + "submit-batch"
 
-	var err error
-
 	var reqs []client.BatchRequest
-	for _, item := range a.cfgs {
+	for i := range a.cfgs {
+		cfg := &a.cfgs[i]
 
-		systemPrompt, err := item.promptDefinition.SystemPrompt()
-		if err != nil {
-			log.Error().Err(err).Msg(semLogContext)
-			return "", nil, err
-		}
-
-		userPrompt, err := item.promptDefinition.UserPrompt(item.PromptVars, true, true)
+		opts, err := a.buildOptions(cfg)
 		if err != nil {
 			log.Error().Err(err).Msg(semLogContext)
 			return "", nil, err
 		}
 
 		reqs = append(reqs, client.BatchRequest{
-			CustomID: item.CustomID,
-			Options: []client.Option{
-				client.WithModel(DefaultConfig.Model),
-				client.WithMaxTokens(DefaultConfig.MaxTokens),
-				client.WithTemperature(DefaultConfig.Temperature),
-				client.WithSystem(string(systemPrompt)),
-				client.WithUserText(string(userPrompt)),
-			},
+			CustomID: cfg.CustomID,
+			Options:  opts,
 		})
 	}
 
@@ -231,4 +285,31 @@ func (a *Agent) submitBatch(cli *client.Client, items agentexecution.AgentExecut
 	}
 
 	return batch.ID, nil, nil
+}
+
+// buildOptions assembles the client call options for a single execution from its
+// config and prompt definition (system + rendered user prompt). Shared by the
+// batch and online paths so both send identical request parameters.
+func (a *Agent) buildOptions(cfg *Config) ([]client.Option, error) {
+	const semLogContext = semLogPackageContext + "build-options"
+
+	systemPrompt, err := cfg.promptDefinition.SystemPrompt()
+	if err != nil {
+		log.Error().Err(err).Msg(semLogContext)
+		return nil, err
+	}
+
+	userPrompt, err := cfg.promptDefinition.UserPrompt(cfg.PromptVars, true, true)
+	if err != nil {
+		log.Error().Err(err).Msg(semLogContext)
+		return nil, err
+	}
+
+	return []client.Option{
+		client.WithModel(cfg.Model),
+		client.WithMaxTokens(cfg.MaxTokens),
+		client.WithTemperature(cfg.Temperature),
+		client.WithSystem(string(systemPrompt)),
+		client.WithUserText(string(userPrompt)),
+	}, nil
 }
