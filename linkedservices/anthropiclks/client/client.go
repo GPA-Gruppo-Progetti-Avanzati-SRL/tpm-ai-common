@@ -430,7 +430,7 @@ func buildParams(cfg config, messages []anthropic.MessageParam) anthropic.Messag
 			params.Thinking = anthropic.ThinkingConfigParamUnion{
 				OfAdaptive: &anthropic.ThinkingConfigAdaptiveParam{},
 			}
-			params.OutputConfig = anthropic.OutputConfigParam{Effort: cfg.thinkingEffort}
+			params.OutputConfig.Effort = cfg.thinkingEffort
 			thinkingApplied = true
 		} else {
 			// Explicit form: budget_tokens (models prior to Claude 4.6). Use the
@@ -454,6 +454,13 @@ func buildParams(cfg config, messages []anthropic.MessageParam) anthropic.Messag
 
 	if !thinkingApplied && cfg.temperature != nil && modelSupportsTemperature(cfg.model) {
 		params.Temperature = anthropic.Float(*cfg.temperature)
+	}
+
+	// JSON structured output: constrain the response to the supplied JSON schema.
+	// Set as a sub-field so it composes with output_config.effort above rather than
+	// clobbering it.
+	if len(cfg.outputSchema) > 0 {
+		params.OutputConfig.Format = anthropic.JSONOutputFormatParam{Schema: cfg.outputSchema}
 	}
 
 	return params

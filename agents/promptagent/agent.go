@@ -305,11 +305,19 @@ func (a *Agent) buildOptions(cfg *Config) ([]client.Option, error) {
 		return nil, err
 	}
 
-	return []client.Option{
+	opts := []client.Option{
 		client.WithModel(cfg.Model),
 		client.WithMaxTokens(cfg.MaxTokens),
 		client.WithTemperature(cfg.Temperature),
 		client.WithSystem(string(systemPrompt)),
 		client.WithUserText(string(userPrompt)),
-	}, nil
+	}
+
+	// When the prompt declares a JSON schema, request structured JSON output
+	// constrained to it.
+	if cfg.promptDefinition.HasSchemaOutput() {
+		opts = append(opts, client.WithOutputSchema(cfg.promptDefinition.Schema))
+	}
+
+	return opts, nil
 }

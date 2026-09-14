@@ -19,6 +19,7 @@ type config struct {
 	toolSet        *tools.ToolSet
 	maxTurns       int
 	progress       chan<- TurnEvent
+	outputSchema   map[string]any // non-empty = request JSON structured output against this JSON schema
 }
 
 func newConfig() config {
@@ -101,6 +102,14 @@ func WithThinking(effort anthropic.OutputConfigEffort, budget ...int) Option {
 			c.thinkingBudget = budget[0]
 		}
 	}
+}
+
+// WithOutputSchema requests JSON structured output constrained to the given JSON
+// schema (sent as output_config.format = json_schema). The schema map must be a
+// valid Anthropic structured-output schema (root object, additionalProperties:
+// false, all properties required). Applies to both Execute and the batch path.
+func WithOutputSchema(schema map[string]any) Option {
+	return func(c *config) { c.outputSchema = schema }
 }
 
 // WithToolSet attaches a ToolSet for RunAgent. Ignored by Execute.

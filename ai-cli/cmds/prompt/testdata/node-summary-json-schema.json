@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "overview", "flowchart"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "Concise summary in Italian of what the COBOL fragment does (max 500 characters)."
+    },
+    "overview": {
+      "type": "string",
+      "description": "Comprehensive functional description in Italian, in markdown."
+    },
+    "flowchart": {
+      "type": "string",
+      "description": "Mermaid flowchart source (flowchart TD) with Italian labels."
+    }
+  }
+}

@@ -2,6 +2,7 @@ package prompt
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -73,6 +74,7 @@ type Definition struct {
 	SystemFn       string             `yaml:"system-fn" mapstructure:"system-fn" json:"system-fn"`
 	TemplateFn     string             `yaml:"template-fn,omitempty" mapstructure:"template-fn,omitempty" json:"template-fn,omitempty"`
 	SchemaFn       string             `yaml:"schema-fn,omitempty" mapstructure:"schema-fn,omitempty" json:"schema-fn,omitempty"`
+	Schema         map[string]any     `yaml:"-" mapstructure:"-" json:"-"`
 	ParsedTemplate *template.Template `yaml:"-" mapstructure:"-" json:"-"`
 	XMLSections    agents.XMLSections `yaml:"xml-sections" mapstructure:"xml-sections" json:"xml-sections"`
 }
@@ -104,10 +106,18 @@ func ReadPromptDefinition(fn string) (Definition, error) {
 	tmpl := template.Must(template.New("").Parse(string(fileContent)))
 	def.ParsedTemplate = tmpl
 
-	def.SchemaFn, _, err = def.Location.resolveFilename("schema-fn", def.SchemaFn, false, true)
+	var schemaContent []byte
+	def.SchemaFn, schemaContent, err = def.Location.resolveFilename("schema-fn", def.SchemaFn, false, true)
 	if err != nil {
 		log.Error().Err(err).Str("fn", fn).Msg(semLogContext + " failed to unmarshal prompt template")
 		return Definition{}, err
+	}
+
+	if def.SchemaFn != "" {
+		if err = json.Unmarshal(schemaContent, &def.Schema); err != nil {
+			log.Error().Err(err).Str("schema-fn", def.SchemaFn).Msg(semLogContext + " failed to unmarshal schema")
+			return Definition{}, err
+		}
 	}
 
 	def.SystemFn, _, err = def.Location.resolveFilename("system-fn", def.SystemFn, true, true)

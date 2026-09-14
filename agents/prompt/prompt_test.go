@@ -12,6 +12,7 @@ import (
 // here to have them covered by TestReadPromptDefinition.
 var testPromptNames = []string{
 	"node-summary",
+	"node-summary-json",
 }
 
 func TestReadPromptDefinition(t *testing.T) {
@@ -50,6 +51,16 @@ func TestReadPromptDefinition(t *testing.T) {
 			// A definition with xml-sections and no schema outputs XML.
 			if len(def.XMLSections) > 0 && def.OutputType() != agents.AgentResponseXML {
 				t.Errorf("OutputType mismatch: got %q, want %q", def.OutputType(), agents.AgentResponseXML)
+			}
+
+			// A definition with a schema-fn loads the schema and outputs JSON.
+			if def.HasSchemaOutput() {
+				if def.OutputType() != agents.AgentResponseJSON {
+					t.Errorf("OutputType mismatch: got %q, want %q", def.OutputType(), agents.AgentResponseJSON)
+				}
+				if len(def.Schema) == 0 {
+					t.Errorf("Schema is empty, expected it to be loaded from %q", def.SchemaFn)
+				}
 			}
 		})
 	}
