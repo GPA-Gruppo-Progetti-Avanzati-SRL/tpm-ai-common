@@ -1,0 +1,8 @@
+name: node-summary
+system-fn: node-summary-system-prompt.txt
+template-fn: node-summary-user-prompt.txt
+schema-fn: node-summary-schema.json
+vars:
+  - name: COBOL_SOURCE
+    type: file
+

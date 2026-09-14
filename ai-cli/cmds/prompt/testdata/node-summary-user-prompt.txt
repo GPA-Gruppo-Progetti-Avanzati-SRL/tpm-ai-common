@@ -1,0 +1,109 @@
+You will be analyzing a COBOL source code fragment, specifically CICS COBOL code, and producing three distinct documentation outputs in Italian.
+
+Here is the COBOL source code fragment to analyze:
+
+<cobol_source>
+{{ .COBOL_SOURCE }}
+</cobol_source>
+
+Your task is to carefully analyze this CICS COBOL fragment and provide three distinct outputs that document its functionality and structure, all written in Italian.
+
+Before creating your outputs, use a scratchpad to analyze the code thoroughly. In your scratchpad, consider and document the following aspects:
+
+- What is the main purpose of this fragment?
+- What are the key CICS commands used? (e.g., EXEC CICS READ, WRITE, SEND, RECEIVE, LINK, XCTL, RETURN, etc.)
+- What is the flow of the fragment?
+- What are the key decision points, branches, or conditional logic in the program?
+- Are there any database operations (VSAM, DB2, IMS, etc.)?
+
+Write your scratchpad analysis in markdown format starting with a level 1 header (single '#'). Place this analysis inside <scratchpad> tags.
+
+Now you will create three outputs, all in Italian:
+
+**Output 1: Summary (Riepilogo)**
+
+Write a concise summary in Italian of what the fragment does. This summary must meet these requirements:
+- Maximum 500 characters in length
+- Written in Italian language
+- Focused on the primary business function or technical purpose
+- Clear and understandable to both technical and business audiences
+- Should capture the essence of what the fragment accomplishes
+
+Place your summary inside <summary> tags.
+
+**Output 2: Functional Overview (Panoramica Funzionale)**
+
+Create a comprehensive functional description in markdown format, written in Italian, that covers:
+- The fragment's main purpose and business function
+- Processing steps or operations in sequence
+- Important CICS commands or operations used
+- Data files, databases, or resources accessed
+- Any notable error handling or special conditions
+- Transaction codes or program identifiers
+
+Use proper markdown formatting including:
+- A level 1 header (#) as the top-level element
+- Level 2 (##) and level 3 (###) headers for subsections
+- Bullet points for lists
+- Bold (**text**) or italic (*text*) for emphasis where appropriate
+- Tables using markdown table syntax where specified
+- If you just put normal text as the title of a paragraph, please, place an empty line after this title.
+
+Place your functional overview inside <overview> tags.
+
+**Output 3: Mermaid Flowchart (Diagramma di Flusso)**
+
+Create a Mermaid flowchart diagram that provides a high-level view of the fragment's structure and flow. The diagram must:
+- Use the "flowchart TD" (top-down) syntax
+- Use `direction TB` for any subgraphs
+- Show the main entry point (at the beginning of the fragment)
+- Represent major processing blocks, paragraphs, or sections
+- Indicate key decision points and branches using diamond shapes
+- Show loops or iterative processing if present
+- Display error handling paths
+- Show the exit points (GOTO, RETURN, XCTL, GOBACK, STOP RUN, etc.)
+- Use appropriate Mermaid syntax for nodes, decisions, and connections
+- In the nodes, do not insert any special characters used as icons; limit styling to the color of the nodes
+- Use Italian labels for all nodes and decision points
+
+For styling, use classDef definitions and apply them to nodes as follows:
+- Normal processing nodes: `classDef block fill:#DAE8FC,stroke:#6C8EBF,stroke-width:2px`
+- Decision nodes: `classDef decision fill:#587294,stroke:#1B2330,stroke-width:2px,color:#ffffff`
+- Start and end points: `classDef startEnd fill:#D5E8D4,stroke:#82B366,stroke-width:2px`
+- Error nodes: `classDef err fill:#F8CECC,stroke:#B85450,stroke-width:2px`
+
+Output raw Mermaid source only. Do NOT wrap the diagram in a markdown code fence (no ``` or ```mermaid delimiters). The very first line inside the <flowchart> tags must be `flowchart TD`, and the last line must be the final Mermaid statement — nothing before or after.
+
+Place your Mermaid diagram inside <flowchart> tags.
+
+**Important Requirements:**
+
+- All three outputs (summary, overview, and flowchart labels) must be written in Italian
+- Follow the exact formatting structure specified for each output
+- Ensure the summary does not exceed 500 characters
+- Use proper markdown syntax in the functional overview
+- Use proper Mermaid syntax in the flowchart with the specified styling
+
+Each output tag must contain ONLY the raw content of its declared type, with no surrounding markdown code fences (no ``` delimiters):
+- <summary> contains plain text only.
+- <overview> contains a markdown document (headers, lists, tables). Markdown code fences are allowed here ONLY to delimit real code samples inside the document, never to wrap the whole output.
+- <flowchart> contains raw Mermaid source only, starting directly with `flowchart TD`.
+Do not add any language annotation (e.g. ```mermaid, ```md, ```text) around the tag contents. The text between the opening and closing tag is saved verbatim to a file, so a stray code fence corrupts that file.
+
+Format your complete response exactly as follows:
+
+<scratchpad>
+[Your analysis in markdown format with Italian annotations]
+</scratchpad>
+
+<summary>
+[Your Italian summary here, maximum 500 characters]
+</summary>
+
+<overview>
+[Your Italian markdown functional description here]
+</overview>
+
+<flowchart>
+[Your Mermaid flowchart diagram here with Italian labels]
+</flowchart>

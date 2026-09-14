@@ -1,0 +1,12 @@
+name: node-summary
+system-fn: node-summary-system-prompt.txt
+template-fn: node-summary-user-prompt.txt
+vars:
+  - name: COBOL_SOURCE
+    type: file
+xml-sections:
+  - name: "first-section"
+    ct: text/markdown
+  - name: "second-section"
+    ct: text/markdown
+

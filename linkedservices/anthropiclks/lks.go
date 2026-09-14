@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	semLogContextBase = "anthropic-lks::"
-	LinkedServiceType = "claude"
+	semLogContextBase          = "anthropic-lks::"
+	LinkedServiceType          = "claude"
+	LinkedServiceTypeAnthropic = "anthropic"
 )
 
 type LinkedService struct {

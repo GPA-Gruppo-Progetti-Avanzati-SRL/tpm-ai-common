@@ -1,36 +1,43 @@
 package prompt
 
 import (
-	"errors"
+	"context"
 	"fmt"
-	"os"
-	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/agents/agentutil"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/agents/promptagent"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/ai-cli/cmds"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/lksregistry"
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-common/util/fileutil"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/store/agentexecution"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
 var (
-	cobFileName       string
-	cobFileNames      []string
-	outFolder         string
-	promptsFolder     string
-	category          string
-	cfgFileName       string
-	batch             bool
-	batchPollInterval time.Duration
+	model                string
+	outFolder            string
+	llmProvider          string
+	promptDefinitionFile string
+	cfgFileName          string
+	batch                bool
+	batchPollInterval    time.Duration
+	promptVars           map[string]string
 )
 
-const semLogContextCmd = "prompt::"
+const (
+	DefaultDomain = "--no-domain--"
+	DefaultSite   = "--no-site--"
+	DefaultGroup  = "--no-group--"
+
+	semLogContextCmd = "prompt::"
+)
 
 var theCmd = &cobra.Command{
-	Use:   "prompt",
+	Use:   "execute",
 	Short: "invokes an llm to execute a prefilled prompt",
 	Long:  "invokes an llm to execute a prefilled prompt",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -49,7 +56,7 @@ var theCmd = &cobra.Command{
 			return
 		}
 
-		log.Info().Strs("cob-files", cobFileNames).Bool("batch", batch).Msg(semLogContext)
+		log.Info().Str("prompt", promptDefinitionFile).Bool("batch", batch).Msg(semLogContext)
 
 		err := doWork()
 		if err != nil {
@@ -74,121 +81,100 @@ func doWork() error {
 		return err
 	}
 
+	agent := promptagent.NewAgentFactory(DefaultDomain, DefaultSite)
+	_, batchId, err := agent.Execute(context.Background(), []agentexecution.AgentExecution{{
+		Domain: DefaultDomain,
+		Site:   DefaultSite,
+		Bid:    promptagent.Name,
+		Et:     agentexecution.EntityType,
+		Status: agentexecution.StatusWorking,
+		Weight: 0,
+		BidRef: agentexecution.BidEtPair{},
+		Params: map[string]any{
+			promptagent.ParamModel:                model,
+			promptagent.ParamOutFolder:            outFolder,
+			promptagent.ParamLlmProvider:          llmProvider,
+			promptagent.ParamPromptDefinitionFile: promptDefinitionFile,
+			promptagent.ParamBatch:                batch,
+			promptagent.ParamBatchPollInterval:    batchPollInterval,
+			promptagent.ParamPromptVars:           promptVars,
+		},
+		Group: DefaultGroup,
+	}})
+
+	if err != nil {
+		log.Error().Err(err).Msg(semLogContext)
+		return err
+	}
+
+	if batchId != "" {
+		log.Info().Str("batch-id", batchId).Msg(semLogContext)
+	}
+
 	return nil
 }
 
 func init() {
-	cmds.RootCmd.AddCommand(theCmd)
-	theCmd.Flags().StringVarP(&cobFileName, "cob-file", "f", "", "comma-separated list of cob files to process")
-	theCmd.Flags().StringVarP(&outFolder, "out-folder", "o", "", "the output folder where to save the analyzed data")
-	theCmd.Flags().StringVarP(&promptsFolder, "prompts-repo", "p", "", "folder where prompts are located")
-	theCmd.Flags().StringVarP(&promptsFolder, "category", "c", "", "category to use")
-	theCmd.Flags().StringVarP(&cfgFileName, "lks-file", "l", "", "linked services config file name")
-	theCmd.Flags().BoolVarP(&batch, "batch", "b", false, "submit all files as a single batch request")
-	theCmd.Flags().DurationVar(&batchPollInterval, "poll-interval", 30*time.Second, "how often to poll for batch completion; set to 0 to fire-and-forget (prints batch ID and exits)")
+	cmds.PromptCmd.AddCommand(theCmd)
+	theCmd.Flags().StringVarP(&model, "model", "M", "", "the prompt definition file to use")
+	theCmd.Flags().StringVarP(&outFolder, "out-folder", "O", "", "the output folder where to save the analyzed data")
+	theCmd.Flags().StringVarP(&promptDefinitionFile, "def", "D", "", "the prompt definition file to use")
+	theCmd.Flags().VarP(newEnumValue(&llmProvider, "", "anthropic", "ollama", "vllm"), "llm", "L", "provider to use (one of: anthropic, ollama, vllm)")
+	theCmd.Flags().StringVarP(&cfgFileName, "cfg-file", "C", "", "config file of linked services")
+	theCmd.Flags().BoolVarP(&batch, "batch", "B", false, "use batch APIs if possible")
+	theCmd.Flags().DurationVar(&batchPollInterval, "poll-interval", 30*time.Second, "(used only with batch enabled and provider supporting it, it specifies how often to poll for batch completion; set to 0 to fire-and-forget (prints batch ID and exits)")
+	// StringToString map flag. Behavioral notes:
+	//   - Repeats merge: --var a=1 --var b=2 -> {a:1, b:2} (first use replaces the
+	//     default, later uses add).
+	//   - Comma is the separator (CSV-parsed): a value containing a comma must be
+	//     CSV-quoted, e.g. -V 'k="a,b"'. The split on '=' is on the first '=', so
+	//     values may contain '='.
+	//   - Default nil means promptVars stays a nil map when the flag is never passed
+	//     (reading is safe; only writing to it would panic). Pass map[string]string{}
+	//     as the default instead if a non-nil map is preferred.
+	theCmd.Flags().StringToStringVarP(&promptVars, "var", "V", nil, "prompt template variables as key=value (repeatable, or comma-separated: -V a=1,b=2)")
+
+	// Presence is enforced by cobra before Run executes; value validity (paths
+	// exist, are files/folders) is still checked in validateArgs.
+	for _, name := range []string{"def", "out-folder", "llm", "cfg-file", "model"} {
+		_ = theCmd.MarkFlagRequired(name)
+	}
 }
+
+// enumValue is a pflag.Value that accepts only one of a fixed set of strings and
+// writes the chosen value into an existing *string, so callers keep using the
+// plain string. An invalid value is rejected by cobra at parse time.
+type enumValue struct {
+	allowed []string
+	value   *string
+}
+
+func newEnumValue(target *string, def string, allowed ...string) *enumValue {
+	*target = def
+	return &enumValue{allowed: allowed, value: target}
+}
+
+func (e *enumValue) String() string { return *e.value }
+
+func (e *enumValue) Set(v string) error {
+	if slices.Contains(e.allowed, v) {
+		*e.value = v
+		return nil
+	}
+	return fmt.Errorf("must be one of %s", strings.Join(e.allowed, ", "))
+}
+
+func (e *enumValue) Type() string { return "string" }
 
 func validateArgs() error {
 	const semLogContext = semLogContextCmd + "validate-args"
 
 	var err error
 
-	cfgFileName, err = resolveFilename("lks-file", cfgFileName, true)
-	if err != nil {
-		return err
-	}
-
-	if cobFileName == "" {
-		err = errors.New("error: please specify cob file name(s)")
-		log.Error().Err(err).Msg(semLogContext)
-		return err
-	}
-
-	for _, part := range strings.Split(cobFileName, ",") {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		resolved, _ := fileutil.ResolvePath(part)
-		if !fileutil.FileExists(resolved) {
-			err = fmt.Errorf("error: cob file doesn't exist: %s", resolved)
-			log.Error().Err(err).Str("cob-file", resolved).Msg(semLogContext)
-			return err
-		}
-		cobFileNames = append(cobFileNames, resolved)
-	}
-
-	if len(cobFileNames) == 0 {
-		err = errors.New("error: no valid cob files specified")
-		log.Error().Err(err).Msg(semLogContext)
-		return err
-	}
-
-	outFolder, err = resolveFolder("out-folder", outFolder, true)
-	if err != nil {
-		return err
-	}
-
-	promptsFolder, err = resolveFolder("prompts-repo", promptsFolder, true)
+	cfgFileName, err = agentutil.ResolveFilename("lks-file", cfgFileName, true)
 	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func resolveFolder(pn, folder string, required bool) (string, error) {
-	const semLogContext = semLogContextCmd + "check-folder"
-	var err error
-
-	if folder == "" && required {
-		err = fmt.Errorf("error: unspecified folder %s param", pn)
-		log.Error().Err(err).Msg(semLogContext)
-		return folder, err
-	}
-
-	if folder != "" {
-		folder, _ = fileutil.ResolvePath(folder)
-		if !fileutil.FileExists(filepath.Dir(folder)) {
-			err = fmt.Errorf("error: folder %s specifies an invalid path", folder)
-			log.Error().Err(err).Msg(semLogContext)
-			return folder, err
-		}
-
-		if fi, err := os.Stat(folder); err != nil || !fi.IsDir() {
-			err = fmt.Errorf("error: folder %s is not a valid folder", folder)
-			log.Error().Err(err).Msg(semLogContext)
-			return folder, err
-		}
-	}
-
-	return folder, nil
-}
-
-func resolveFilename(pn, fn string, required bool) (string, error) {
-	const semLogContext = semLogContextCmd + "resolve-filename"
-	var err error
-
-	if fn == "" && required {
-		err = fmt.Errorf("error: unspecified file %s param", pn)
-		log.Error().Err(err).Msg(semLogContext)
-		return fn, err
-	}
-
-	if fn != "" {
-		fn, _ = fileutil.ResolvePath(fn)
-		if !fileutil.FileExists(filepath.Dir(fn)) {
-			err = fmt.Errorf("error: file %s specifies an invalid path", fn)
-			log.Error().Err(err).Msg(semLogContext)
-			return fn, err
-		}
-
-		if fi, err := os.Stat(fn); err != nil || fi.IsDir() {
-			err = fmt.Errorf("error: file %s is not a valid file", fn)
-			log.Error().Err(err).Msg(semLogContext)
-			return fn, err
-		}
-	}
-
-	return fn, nil
 }
