@@ -64,7 +64,7 @@ var DefaultConfig = Config{
 func NewConfig(params map[string]any) *Config {
 	cfg := DefaultConfig
 
-	cfg.CustomID = util.NewUUID()
+	cfg.CustomID = "custom-id-not-assigned"
 
 	// String fields fall back to the DefaultConfig value when the supplied value
 	// is absent, the wrong type, or empty.

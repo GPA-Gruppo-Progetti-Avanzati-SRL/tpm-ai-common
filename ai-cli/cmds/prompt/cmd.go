@@ -13,7 +13,6 @@ import (
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/ai-cli/cmds"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/lksregistry"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/store/agentexecution"
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-common/util"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -87,7 +86,7 @@ func doWork() error {
 	agent := promptagent.NewAgentFactory(DefaultDomain, DefaultSite)
 	resp, err := agent.Execute(context.Background(),
 		[]agentexecution.AgentExecution{{
-			CustomID: util.NewUUID(),
+			CustomID: fmt.Sprintf("REQUEST-ID-%02d", 1),
 			Domain:   DefaultDomain,
 			Site:     DefaultSite,
 			Bid:      promptagent.Name,

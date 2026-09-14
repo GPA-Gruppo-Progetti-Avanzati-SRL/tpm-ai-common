@@ -20,7 +20,7 @@ const (
 type AgentExecutionResponse struct {
 	CustomId    string      `json:"custom-id" yaml:"custom-id" mapstructure:"custom-id"`
 	Status      string      `json:"status" yaml:"status" mapstructure:"status"`
-	Content     []byte      `json:"content" yaml:"content" mapstructure:"content"`
+	Content     []byte      `yaml:"-" mapstructure:"-" json:"-"`
 	Ct          string      `json:"ct" yaml:"ct" mapstructure:"ct"`
 	XMLSections XMLSections `json:"xml_sections" yaml:"xml_sections" mapstructure:"xml_sections"`
 }
@@ -39,7 +39,7 @@ type BatchExecutionHint struct {
 
 type Agent interface {
 	Name() string
-	Execute(ctx context.Context, execs agentexecution.AgentExecutions, batchExecution BatchExecutionHint) (*AgentResponse, error)
+	Execute(ctx context.Context, execs agentexecution.AgentExecutions, batchExecutionHint ...BatchExecutionHint) (*AgentResponse, error)
 	OnBatchResult(br *client.BatchResult, agentExec *agentexecution.AgentExecution) (AgentExecutionResponse, error)
 }
 

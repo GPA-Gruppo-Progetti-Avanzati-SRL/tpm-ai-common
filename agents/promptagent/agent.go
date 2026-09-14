@@ -31,12 +31,18 @@ func (a *Agent) Name() string {
 	return Name
 }
 
-func (a *Agent) Execute(_ context.Context, execs agentexecution.AgentExecutions, batchExecution agents.BatchExecutionHint) (*agents.AgentResponse, error) {
+func (a *Agent) Execute(_ context.Context, execs agentexecution.AgentExecutions, batchExecution ...agents.BatchExecutionHint) (*agents.AgentResponse, error) {
 	const semLogContext = semLogPackageContext + "execute"
 	var err error
 
 	if len(execs) == 0 {
 		err = errors.New(semLogContext + " no agent executions provided")
+		log.Error().Err(err).Msg(semLogContext)
+		return nil, err
+	}
+
+	if len(batchExecution) == 0 {
+		err = errors.New(semLogContext + " no batch executions provided, online not yet implemented")
 		log.Error().Err(err).Msg(semLogContext)
 		return nil, err
 	}
@@ -48,6 +54,7 @@ func (a *Agent) Execute(_ context.Context, execs agentexecution.AgentExecutions,
 			return nil, err
 		}
 
+		cfg.CustomID = exec.CustomID
 		cfg.promptDefinition, err = prompt.ReadPromptDefinition(cfg.PromptDefinitionFile)
 		if err != nil {
 			log.Error().Err(err).Msg(semLogContext)
@@ -64,17 +71,17 @@ func (a *Agent) Execute(_ context.Context, execs agentexecution.AgentExecutions,
 	}
 
 	var batchId string
-	if batchExecution.BatchId == "" {
+	if batchExecution[0].BatchId == "" {
 		batchId, _, err = a.submitBatch(cli, execs)
 		if err != nil {
 			log.Error().Err(err).Msg(semLogContext)
 			return nil, err
 		}
 	} else {
-		batchId = batchExecution.BatchId
+		batchId = batchExecution[0].BatchId
 	}
 
-	batchReady, err := a.pollBatch(cli, batchId, batchExecution)
+	batchReady, err := a.pollBatch(cli, batchId, batchExecution[0])
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
 		return nil, err
