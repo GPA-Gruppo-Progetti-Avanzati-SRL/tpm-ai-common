@@ -1,8 +1,14 @@
 name: node-summary
 system-fn: node-summary-system-prompt.txt
 template-fn: node-summary-user-prompt.txt
-schema-fn: node-summary-schema.json
+# schema-fn: node-summary-schema.json
 vars:
   - name: COBOL_SOURCE
     type: file
-
+xml-sections:
+  - name: "overview"
+    ct: text/markdown
+  - name: "flowchart"
+    ct: text/vnd.mermaid
+  - name: "summary"
+    ct: text/plain

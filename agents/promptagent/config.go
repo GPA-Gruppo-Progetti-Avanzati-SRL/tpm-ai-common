@@ -18,12 +18,11 @@ const (
 	ParamOutFolder            = "out-folder"
 	ParamLlmProvider          = "llm-provider"
 	ParamPromptDefinitionFile = "prompt-definition-file"
-	ParamBatch                = "batch"
-	ParamBatchPollInterval    = "batch-poll-interval"
 	ParamPromptVars           = "prompt-vars"
 )
 
 type Config struct {
+	CustomID             string
 	Model                string
 	OutFolder            string
 	LlmProvider          string
@@ -39,10 +38,24 @@ type Config struct {
 	promptDefinition prompt.Definition
 }
 
+type AgentParams []Config
+
+func (items AgentParams) FirstByCustomId(cid string) int {
+
+	for i, e := range items {
+		if e.CustomID == cid {
+			return i
+		}
+	}
+
+	return -1
+}
+
 var DefaultConfig = Config{
-	Model:       anthropic.ModelClaudeSonnet4_6,
-	Temperature: 0.2,
-	MaxTokens:   20000,
+	Model:             anthropic.ModelClaudeSonnet4_6,
+	Temperature:       0.2,
+	MaxTokens:         20000,
+	BatchPollInterval: 30 * time.Second,
 }
 
 // NewConfig builds a Config starting from DefaultConfig and overriding any field
@@ -51,6 +64,8 @@ var DefaultConfig = Config{
 func NewConfig(params map[string]any) *Config {
 	cfg := DefaultConfig
 
+	cfg.CustomID = util.NewUUID()
+
 	// String fields fall back to the DefaultConfig value when the supplied value
 	// is absent, the wrong type, or empty.
 	cfg.Model = paramString(params, ParamModel, DefaultConfig.Model)
@@ -58,12 +73,6 @@ func NewConfig(params map[string]any) *Config {
 	cfg.LlmProvider = paramString(params, ParamLlmProvider, DefaultConfig.LlmProvider)
 	cfg.PromptDefinitionFile = paramString(params, ParamPromptDefinitionFile, DefaultConfig.PromptDefinitionFile)
 
-	if v, ok := params[ParamBatch].(bool); ok {
-		cfg.Batch = v
-	}
-	if v, ok := params[ParamBatchPollInterval].(time.Duration); ok {
-		cfg.BatchPollInterval = v
-	}
 	if v, ok := params[ParamPromptVars].(map[string]string); ok {
 		cfg.PromptVars = v
 	}

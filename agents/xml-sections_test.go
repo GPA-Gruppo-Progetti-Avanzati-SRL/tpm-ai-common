@@ -115,7 +115,8 @@ flowchart TD
   A --> B
 </flowchart>`
 
-	if err := doc.ExtractFromText(text); err != nil {
+	xmlSections, err := doc.ExtractFromText(text)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -128,7 +129,7 @@ flowchart TD
 	}
 
 	for name, wantData := range cases {
-		s, ok := doc.SectionByName(name)
+		s, ok := xmlSections.SectionByName(name)
 		if !ok {
 			t.Fatalf("section %q not found", name)
 		}
@@ -185,7 +186,7 @@ func TestExtractFromTextMissingRequired(t *testing.T) {
 only the summary is present
 </summary>`
 
-	err := doc.ExtractFromText(text)
+	_, err := doc.ExtractFromText(text)
 	if err == nil {
 		t.Fatal("expected an error for missing required section, got nil")
 	}
@@ -201,14 +202,15 @@ func TestExtractFromTextMissingOptional(t *testing.T) {
 only the summary is present
 </summary>`
 
-	if err := doc.ExtractFromText(text); err != nil {
+	xmlSections, err := doc.ExtractFromText(text)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if s, ok := doc.SectionByName("overview"); !ok || s.Data != nil {
+	if s, ok := xmlSections.SectionByName("overview"); !ok || s.Data != nil {
 		t.Errorf("expected overview data to be nil, got %q", string(s.Data))
 	}
-	if s, ok := doc.SectionByName("summary"); !ok || string(s.Data) != "only the summary is present\n" {
+	if s, ok := xmlSections.SectionByName("summary"); !ok || string(s.Data) != "only the summary is present\n" {
 		t.Errorf("unexpected summary data: %q", s.Data)
 	}
 }

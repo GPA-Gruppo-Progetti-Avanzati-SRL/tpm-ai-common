@@ -44,6 +44,17 @@ type CounterQueryResult struct {
 
 type AgentExecutions []AgentExecution
 
+func (items AgentExecutions) FirstByCustomId(cid string) int {
+
+	for i, e := range items {
+		if e.CustomID == cid {
+			return i
+		}
+	}
+
+	return -1
+}
+
 func (items AgentExecutions) ToListOfObjectIds() []string {
 	var objectIds []string
 	for _, e := range items {
@@ -78,7 +89,8 @@ type AgentExecution struct {
 	Group   string        `json:"group,omitempty" bson:"group,omitempty" yaml:"group,omitempty"`
 
 	// @tpm-schematics:start-region("struct-section")
-	Count int32 `json:"count,omitempty" bson:"count,omitempty" yaml:"count,omitempty"`
+	Count    int32  `json:"count,omitempty" bson:"count,omitempty" yaml:"count,omitempty"`
+	CustomID string `json:"custom_id,omitempty" bson:"custom_id,omitempty" yaml:"custom_id,omitempty"`
 	// @tpm-schematics:end-region("struct-section")
 }
 

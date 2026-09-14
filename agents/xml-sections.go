@@ -79,28 +79,30 @@ func (xs XMLSections) ExtractParts(text string) (map[string]string, error) {
 // ExtractFromText carves the XML-delimited sections out of text and populates
 // each matching section's Data. A required section missing from the text yields
 // an error.
-func (xs XMLSections) ExtractFromText(text string) error {
+func (xs XMLSections) ExtractFromText(text string) (XMLSections, error) {
 	const semLogContext = semLogPackageContext + "extract-from-text"
 
 	parts, err := xs.ExtractParts(text)
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
-		return err
+		return nil, err
 	}
 
-	for i := range xs {
-		content, ok := parts[xs[i].Name]
+	var newXS XMLSections
+	for _, sect := range xs {
+		content, ok := parts[sect.Name]
 		if !ok {
-			if xs[i].Required {
-				err = fmt.Errorf("required section %q not found in text", xs[i].Name)
+			if sect.Required {
+				err = fmt.Errorf("required section %q not found in text", sect.Name)
 				log.Error().Err(err).Msg(semLogContext)
-				return err
+				return nil, err
 			}
-			xs[i].Data = nil
-			continue
+			sect.Data = nil
+		} else {
+			sect.Data = []byte(content)
 		}
-		xs[i].Data = []byte(content)
+		newXS = append(newXS, sect)
 	}
 
-	return nil
+	return newXS, nil
 }

@@ -7,11 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/agents"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/agents/agentutil"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/agents/promptagent"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/ai-cli/cmds"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/lksregistry"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/store/agentexecution"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-common/util"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -26,6 +28,7 @@ var (
 	batch                bool
 	batchPollInterval    time.Duration
 	promptVars           map[string]string
+	batchid              string
 )
 
 const (
@@ -82,34 +85,34 @@ func doWork() error {
 	}
 
 	agent := promptagent.NewAgentFactory(DefaultDomain, DefaultSite)
-	_, batchId, err := agent.Execute(context.Background(), []agentexecution.AgentExecution{{
-		Domain: DefaultDomain,
-		Site:   DefaultSite,
-		Bid:    promptagent.Name,
-		Et:     agentexecution.EntityType,
-		Status: agentexecution.StatusWorking,
-		Weight: 0,
-		BidRef: agentexecution.BidEtPair{},
-		Params: map[string]any{
-			promptagent.ParamModel:                model,
-			promptagent.ParamOutFolder:            outFolder,
-			promptagent.ParamLlmProvider:          llmProvider,
-			promptagent.ParamPromptDefinitionFile: promptDefinitionFile,
-			promptagent.ParamBatch:                batch,
-			promptagent.ParamBatchPollInterval:    batchPollInterval,
-			promptagent.ParamPromptVars:           promptVars,
-		},
-		Group: DefaultGroup,
-	}})
+	resp, err := agent.Execute(context.Background(),
+		[]agentexecution.AgentExecution{{
+			CustomID: util.NewUUID(),
+			Domain:   DefaultDomain,
+			Site:     DefaultSite,
+			Bid:      promptagent.Name,
+			Et:       agentexecution.EntityType,
+			Status:   agentexecution.StatusWorking,
+			Weight:   0,
+			BidRef:   agentexecution.BidEtPair{},
+			Params: map[string]any{
+				promptagent.ParamModel:                model,
+				promptagent.ParamOutFolder:            outFolder,
+				promptagent.ParamLlmProvider:          llmProvider,
+				promptagent.ParamPromptDefinitionFile: promptDefinitionFile,
+				promptagent.ParamPromptVars:           promptVars,
+			},
+			Group: DefaultGroup,
+		}},
+		agents.BatchExecutionHint{BatchId: batchid, BatchPollInterval: batchPollInterval},
+	)
 
 	if err != nil {
 		log.Error().Err(err).Msg(semLogContext)
 		return err
 	}
 
-	if batchId != "" {
-		log.Info().Str("batch-id", batchId).Msg(semLogContext)
-	}
+	log.Info().Interface("resp", resp).Msg(semLogContext)
 
 	return nil
 }
@@ -122,6 +125,7 @@ func init() {
 	theCmd.Flags().VarP(newEnumValue(&llmProvider, "", "anthropic", "ollama", "vllm"), "llm", "L", "provider to use (one of: anthropic, ollama, vllm)")
 	theCmd.Flags().StringVarP(&cfgFileName, "cfg-file", "C", "", "config file of linked services")
 	theCmd.Flags().BoolVarP(&batch, "batch", "B", false, "use batch APIs if possible")
+	theCmd.Flags().StringVarP(&batchid, "resume-batch-id", "R", "", "use this to resume a batch-id from a previous run")
 	theCmd.Flags().DurationVar(&batchPollInterval, "poll-interval", 30*time.Second, "(used only with batch enabled and provider supporting it, it specifies how often to poll for batch completion; set to 0 to fire-and-forget (prints batch ID and exits)")
 	// StringToString map flag. Behavioral notes:
 	//   - Repeats merge: --var a=1 --var b=2 -> {a:1, b:2} (first use replaces the

@@ -65,6 +65,7 @@ var cmdTestGroups = []cmdTestGroup{
 					"--cfg-file", "config.yml",
 					"--out-folder", "/tmp",
 					"--verbose",
+					"--resume-batch-id", "msgbatch_01YJ72Z432MxHeMqRkNhJ7iV",
 				},
 				enabled: true,
 			},
