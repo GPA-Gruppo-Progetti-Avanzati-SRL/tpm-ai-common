@@ -1,0 +1,64 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["program_name","program_type","middleware","database",
+    "entry_interface","known_external_programs","special_dialect_features"],
+  "properties": {
+    "program_name": { "type": "string" },
+
+    "program_type": {
+      "type": "object", "additionalProperties": false, "required": ["kind"],
+      "properties": {
+        "kind":   { "type": "string",
+          "enum": ["CICS_ONLINE","CALLED_SUBPROGRAM","BATCH","OTHER"] },
+        "detail": { "type": "string", "description": "required only when kind = OTHER" }
+      }
+    },
+
+    "middleware": { "type": "string", "enum": ["CICS","IMS","NONE"] },
+
+    "database": {
+      "type": "array",
+      "items": { "type": "string",
+        "enum": ["DB2_EMBEDDED_SQL","VSAM_VIA_CICS","VSAM_SEQUENTIAL_INDEXED","NONE"] }
+    },
+
+    "entry_interface": {
+      "type": "object", "additionalProperties": false, "required": ["type","java_entry"],
+      "properties": {
+        "type": { "type": "string",
+          "enum": ["DFHCOMMAREA_VIA_COPY","DFHCOMMAREA_INLINE",
+            "LINKAGE_SECTION_ONLY","COMMAND_LINE_PARM","NONE"] },
+        "copybook":   { "type": "string", "description": "copybook name when type = *_VIA_COPY" },
+        "detail":     { "type": "string", "description": "top-level sub-groups, one line each" },
+        "java_entry": { "type": "string", "description": "e.g. execute(C6Ap01asCommarea ca)" }
+      }
+    },
+
+    "known_external_programs": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["program_name","how_invoked","is_dynamic"],
+        "properties": {
+          "program_name": { "type": "string" },
+          "how_invoked":  { "type": "string",
+            "enum": ["EXEC_CICS_LINK","EXEC_CICS_XCTL","CALL"] },
+          "is_dynamic":   { "type": "boolean" },
+          "commarea":     { "type": "string" },
+          "notes":        { "type": "string" },
+          "move_targets": { "type": "array", "items": { "type": "string" },
+            "description": "MOVE targets for dynamic (variable-name) calls" }
+        }
+      }
+    },
+
+    "special_dialect_features": {
+      "type": "array",
+      "items": { "type": "string",
+        "enum": ["DECIMAL_POINT_IS_COMMA","COMP_3_PACKED_DECIMAL","COMP_BINARY",
+          "VARCHAR_LEN_TEXT_PAIRS","CBL_OR_PROCESS_OPTIONS",
+          "COPY_REPLACING_OR_IN_LIBRARY"] }
+    }
+  }
+}

@@ -1,0 +1,3 @@
+<cobol_source>
+{{.COBOL_SOURCE}}
+</cobol_source>

@@ -1,0 +1,7 @@
+name: program-info
+system-fn: program-info-system-prompt.txt
+template-fn: program-info-user-prompt.txt
+schema-fn: program-info-schema.json
+vars:
+  - name: COBOL_SOURCE
+    type: file
