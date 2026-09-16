@@ -6,7 +6,31 @@ program_type  — priority: any EXEC CICS → CICS_ONLINE; else USING non-DFHCOM
                 no CICS → CALLED_SUBPROGRAM; else no CICS and no USING → BATCH; else OTHER (+detail).
 database      — EXEC SQL → DB2_EMBEDDED_SQL; EXEC CICS file cmd with FILE() → VSAM_VIA_CICS;
                 plain READ/WRITE on an FD → VSAM_SEQUENTIAL_INDEXED; none → NONE; list all that apply.
-entry_interface — [the current priority 1–4 rules, verbatim, producing type + copybook + detail + java_entry]
+entry_interface — inspect LINKAGE SECTION and PROCEDURE DIVISION USING, priority 1-4:
+  1. First USING item is DFHCOMMAREA:
+     - A COPY statement appears inside the 01 DFHCOMMAREA group → type = DFHCOMMAREA_VIA_COPY;
+       put the copied member name in `copybook`; leave `inline_group` empty.
+     - No COPY (the layout is spelled out inline) → type = DFHCOMMAREA_INLINE;
+       put the name of the 01-level subordinate group directly under DFHCOMMAREA in `inline_group`;
+       leave `copybook` empty.
+     Never put an inline group name in `copybook`, and never set VIA_COPY without an actual COPY.
+  2. USING is a PIC S9(4) COMP length + PIC X(n) data pair → COMMAND_LINE_PARM.
+  3. USING one or more named non-DFHCOMMAREA areas, no CICS → LINKAGE_SECTION_ONLY.
+  4. No USING clause → NONE.
+  detail — one array entry per sub-group: `group` = the sub-group name, `description` = what it
+           holds (describe the contents, not just the name; e.g. group "C6SP01A-GRDATIIN",
+           description "input data group: service code, entity type/code, search dates, indicators").
+  java_entry — execute(<ClassName>Commarea ca); ClassName is the copybook or inline group name,
+               camelCased with hyphens removed.
 known_external_programs — scan PROCEDURE DIVISION for EXEC CICS LINK/XCTL and CALL; for each set
-                program_name, how_invoked, is_dynamic; for dynamic calls fill move_targets; commarea/notes as known.
-special_dialect_features — include each checklist token that applies (empty array if none).
+                program_name, how_invoked, is_dynamic; for dynamic calls fill move_targets.
+                commarea — `name` = the commarea copybook or inline area name; `layout` = a brief
+                note of its fields when defined inline.
+                notes — REQUIRED when inferable: the program's purpose AND the paragraph(s) it is
+                called from (e.g. "date arithmetic utility, function 3 = +1 day / 4 = -1 day;
+                called from UTDATA-SOMMA and UTDATA-SOTTR").
+special_dialect_features — one array entry per feature that applies (empty array if none):
+                `feature` = the token, `evidence` = the variable names or clause that triggered it.
+                Tokens: DECIMAL_POINT_IS_COMMA, COMP_3_PACKED_DECIMAL, COMP_BINARY,
+                VARCHAR_LEN_TEXT_PAIRS, CBL_OR_PROCESS_OPTIONS, COPY_REPLACING_OR_IN_LIBRARY,
+                REDEFINES_DECIMAL_ALIGNMENT (REDEFINES used to realign the decimal point on shared numeric work fields).

@@ -29,9 +29,23 @@
         "type": { "type": "string",
           "enum": ["DFHCOMMAREA_VIA_COPY","DFHCOMMAREA_INLINE",
             "LINKAGE_SECTION_ONLY","COMMAND_LINE_PARM","NONE"] },
-        "copybook":   { "type": "string", "description": "copybook name when type = *_VIA_COPY" },
-        "detail":     { "type": "string", "description": "top-level sub-groups, one line each" },
-        "java_entry": { "type": "string", "description": "e.g. execute(C6Ap01asCommarea ca)" }
+        "copybook":     { "type": "string",
+          "description": "copied member name; set ONLY when type = DFHCOMMAREA_VIA_COPY (an actual COPY statement is present). Leave empty for the inline case." },
+        "inline_group": { "type": "string",
+          "description": "name of the 01-level subordinate group directly under DFHCOMMAREA; set ONLY when type = DFHCOMMAREA_INLINE (no COPY statement). Drives the Java class name." },
+        "detail":       {
+          "type": "array",
+          "description": "one entry per sub-group under the inline group / commarea",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["group","description"],
+            "properties": {
+              "group":       { "type": "string", "description": "e.g. C6SP01A-GRDATIIN" },
+              "description": { "type": "string", "description": "what the group holds" }
+            }
+          }
+        },
+        "java_entry":   { "type": "string", "description": "e.g. execute(C6Ap01asCommarea ca)" }
       }
     },
 
@@ -45,7 +59,14 @@
           "how_invoked":  { "type": "string",
             "enum": ["EXEC_CICS_LINK","EXEC_CICS_XCTL","CALL"] },
           "is_dynamic":   { "type": "boolean" },
-          "commarea":     { "type": "string" },
+          "commarea":     {
+            "type": "object", "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name":   { "type": "string", "description": "commarea copybook or inline area name" },
+              "layout": { "type": "string", "description": "brief field layout when defined inline" }
+            }
+          },
           "notes":        { "type": "string" },
           "move_targets": { "type": "array", "items": { "type": "string" },
             "description": "MOVE targets for dynamic (variable-name) calls" }
@@ -55,10 +76,18 @@
 
     "special_dialect_features": {
       "type": "array",
-      "items": { "type": "string",
-        "enum": ["DECIMAL_POINT_IS_COMMA","COMP_3_PACKED_DECIMAL","COMP_BINARY",
-          "VARCHAR_LEN_TEXT_PAIRS","CBL_OR_PROCESS_OPTIONS",
-          "COPY_REPLACING_OR_IN_LIBRARY"] }
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["feature"],
+        "properties": {
+          "feature":  { "type": "string",
+            "enum": ["DECIMAL_POINT_IS_COMMA","COMP_3_PACKED_DECIMAL","COMP_BINARY",
+              "VARCHAR_LEN_TEXT_PAIRS","CBL_OR_PROCESS_OPTIONS",
+              "COPY_REPLACING_OR_IN_LIBRARY","REDEFINES_DECIMAL_ALIGNMENT"] },
+          "evidence": { "type": "string",
+            "description": "example variable names or the clause that triggered it" }
+        }
+      }
     }
   }
 }
