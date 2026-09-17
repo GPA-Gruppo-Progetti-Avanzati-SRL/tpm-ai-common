@@ -418,6 +418,22 @@ func buildParams(cfg config, messages []anthropic.MessageParam) anthropic.Messag
 		params.Tools = cfg.toolSet.Params()
 	}
 
+	// Prompt caching is prefix-based: one cache_control marker caches everything
+	// from the start of the request up to the block it sits on. The request is
+	// ordered tools -> system, so the marker goes on the last block of that stable
+	// prefix — the system prompt when set (which also caches the tools before it),
+	// otherwise the last tool. Repeated calls with the same prefix (every turn of
+	// RunAgent) then read it from cache instead of reprocessing.
+	if cfg.cache {
+		if n := len(params.System); n > 0 {
+			params.System[n-1].CacheControl = anthropic.NewCacheControlEphemeralParam()
+		} else if n := len(params.Tools); n > 0 {
+			if t := params.Tools[n-1].OfTool; t != nil {
+				t.CacheControl = anthropic.NewCacheControlEphemeralParam()
+			}
+		}
+	}
+
 	// Thinking is driven by cfg.thinkingEffort ("" = off). The wire form is chosen
 	// from the model: adaptive (output_config.effort) on 4.6+, budget_tokens on
 	// older models. When thinking is actually applied, temperature must be omitted

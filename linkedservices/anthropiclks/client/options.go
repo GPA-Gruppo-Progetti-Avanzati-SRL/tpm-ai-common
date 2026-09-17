@@ -20,6 +20,7 @@ type config struct {
 	maxTurns       int
 	progress       chan<- TurnEvent
 	outputSchema   map[string]any // non-empty = request JSON structured output against this JSON schema
+	cache          bool           // true = mark the stable tools+system prefix cacheable
 }
 
 func newConfig() config {
@@ -77,6 +78,28 @@ func WithUserText(text string) Option {
 // cached blocks, images, or multi-part messages.
 func WithUserContent(blocks ...anthropic.ContentBlockParamUnion) Option {
 	return func(c *config) { c.content = blocks }
+}
+
+// WithCache marks the stable tools+system prefix as cacheable (cache_control:
+// ephemeral).
+//
+// Prompt caching is prefix-based: the marker caches everything from the start of
+// the request up to and including the block it is placed on. The request is
+// ordered tools -> system -> messages, and buildParams places the marker on the
+// last block of that stable prefix — the system prompt when set (which caches the
+// tools too, since they come first), otherwise the last tool. So this caches the
+// prefix regardless of whether a system prompt is present; it is not tied to the
+// system string.
+//
+// The payoff is a repeated, identical prefix: RunAgent re-sends the same tools
+// and system prompt on every turn, so from turn 2 onward that prefix is read from
+// cache (~90% cheaper on those input tokens) instead of reprocessed. The first
+// call writes the cache (~25% surcharge on those tokens, once). A single Execute
+// call only benefits if the caller repeats it with the same prefix.
+//
+// No-op only when there is neither a system prompt nor any tools — nothing to mark.
+func WithCache() Option {
+	return func(c *config) { c.cache = true }
 }
 
 // WithThinking enables extended thinking. effort is the model-independent driver,
