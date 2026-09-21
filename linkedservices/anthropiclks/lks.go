@@ -1,6 +1,8 @@
 package anthropiclks
 
 import (
+	"errors"
+
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/anthropiclks/client"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-ai-common/linkedservices/prompts"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-client/restclient"
@@ -76,6 +78,15 @@ func NewBatchClient() (BatchClient, error) {
 }
 
 func NewClientNG() (*client.Client, error) {
+	const semLogContext = "anthropic-lks-registry::new-client-ng"
+
+	// Guard the singleton accessor: theLks may never have been initialized (Initialize not called, or
+	// called with no 'anthropic' config), so it must not nil-deref theLks.Cfg. Return an error instead
+	// of panicking — callers that don't need the client (e.g. deterministic steps) can ignore it. The
+	// method below trusts its receiver; a nil/empty *LinkedService is the caller's responsibility.
+	if theLks.Cfg == nil {
+		return nil, errors.New(semLogContext + ": anthropic linked service not initialized (no 'anthropic' config / Initialize not called)")
+	}
 	return theLks.NewClientNG()
 }
 
