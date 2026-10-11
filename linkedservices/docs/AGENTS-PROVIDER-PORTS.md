@@ -147,6 +147,83 @@ Honor-or-ignore is only safe for one of these buckets:
 
 The superset works **only** because bucket 3 is gated by `Capabilities()` (§5).
 
+### Usage accounting — a neutral `Usage`, summed by a neutral accumulator
+
+`Result` carries token usage, and it follows the **same superset rule as `Request`**:
+a neutral `llm.Usage` struct, each adapter fills the fields its provider reports and
+leaves the rest zero — never an SDK usage type surfaced upward.
+
+```go
+// llm.Usage — neutral token accounting. Superset: each adapter fills what its
+// provider reports and leaves the rest zero. Invariant: the three input buckets
+// are DISJOINT, so their sum is the true total input (see TotalInputTokens).
+type Usage struct {
+    InputTokens           int64 // fresh input: not from cache, not written to cache
+    OutputTokens          int64
+    CacheReadInputTokens  int64 // input served from cache
+    CacheWriteInputTokens int64 // input written to cache (cache creation)
+    ReasoningTokens       int64 // thinking/reasoning tokens
+}
+
+// TotalInputTokens is the total input processed, cache reads included.
+func (u Usage) TotalInputTokens() int64 {
+    return u.InputTokens + u.CacheReadInputTokens + u.CacheWriteInputTokens
+}
+```
+
+**The disjoint-buckets invariant is the load-bearing decision**, because providers
+disagree on whether reported input already includes cache. The neutral type commits
+to disjoint: `InputTokens`, `CacheReadInputTokens`, and `CacheWriteInputTokens` never
+overlap, so summing them back gives total input. Each adapter must normalize to that:
+
+- **Anthropic** already reports the three disjoint (`input_tokens` excludes both cache
+  columns) — map straight across, and `TotalInputTokens` reconstructs the Anthropic total exactly.
+- **OpenAI** reports them overlapping (`prompt_tokens` includes `cached_tokens` as a
+  subset) — the adapter must subtract: `InputTokens = prompt_tokens − cached_tokens`,
+  `CacheReadInputTokens = cached_tokens`, `CacheWriteInputTokens = 0` (no cache-write billing).
+- **Ollama** — `prompt_eval_count → InputTokens`, both cache fields 0.
+
+"Input includes cache or not" is exactly the provider quirk that silently corrupts a
+cost figure, so getting this right in each adapter mapping is the one thing that matters.
+
+**Generalizing `Add` needs no interface.** Summation requires a common set of fields;
+an interface over provider usage types could not add two different concrete shapes
+together without first projecting both onto one representation — so the neutral value
+type *is* the generalization, and an interface would buy nothing. `Add` is plain
+field-wise summation over `llm.Usage`; all provider knowledge lives in the adapter
+mapping, which keeps `Add` trivial and consistent with "provider quirks stay down":
+
+```go
+// in llm — the neutral accumulator (mirrors client.UsageAccumulator, neutral currency)
+func (a *UsageAccumulator) Add(u Usage) {
+    a.calls++
+    a.total.InputTokens           += u.InputTokens
+    a.total.OutputTokens          += u.OutputTokens
+    a.total.CacheReadInputTokens  += u.CacheReadInputTokens
+    a.total.CacheWriteInputTokens += u.CacheWriteInputTokens
+    a.total.ReasoningTokens       += u.ReasoningTokens
+}
+
+// in the Anthropic adapter — the only place that knows anthropic.Usage
+func usageFromAnthropic(u anthropic.Usage) llm.Usage {
+    return llm.Usage{
+        InputTokens:           u.InputTokens,               // already disjoint
+        OutputTokens:          u.OutputTokens,
+        CacheReadInputTokens:  u.CacheReadInputTokens,
+        CacheWriteInputTokens: u.CacheCreationInputTokens,  // 1h+5m TTL buckets collapse here
+        ReasoningTokens:       u.OutputTokensDetails.ThinkingTokens,
+    }
+}
+```
+
+What the mapping drops on the way up — the 1h/5m cache-TTL split and the
+`web_fetch`/`web_search` server-tool counts — has no cross-provider peer, so it folds
+away above the port. It is **not lost**: the Layer-1 `anthropiclks/client.UsageAccumulator`
+(which sums the full `anthropic.Usage`, every field) keeps it full-fidelity for
+wrapper-direct callers. So there are **two accumulators, same shape, different currency** —
+`client.UsageAccumulator` sums `anthropic.Usage` for Layer-1 callers; `llm.UsageAccumulator`
+sums `llm.Usage` for port callers — and `usageFromAnthropic` is the seam between them.
+
 ## 5. Capabilities() — gating the contract-changing fields
 
 ```go

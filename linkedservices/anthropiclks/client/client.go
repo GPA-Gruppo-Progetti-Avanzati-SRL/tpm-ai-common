@@ -116,7 +116,7 @@ func (c *Client) RunAgent(ctx context.Context, opts ...Option) (*AgentResponse, 
 		anthropic.NewUserMessage(cfg.content...),
 	}
 
-	var totalUsage anthropic.Usage
+	var usage UsageAccumulator
 
 	for turn := 1; turn <= cfg.maxTurns; turn++ {
 		params := buildParams(cfg, messages)
@@ -154,10 +154,7 @@ func (c *Client) RunAgent(ctx context.Context, opts ...Option) (*AgentResponse, 
 			)
 		}
 
-		totalUsage.InputTokens += resp.Usage.InputTokens
-		totalUsage.OutputTokens += resp.Usage.OutputTokens
-		totalUsage.CacheReadInputTokens += resp.Usage.CacheReadInputTokens
-		totalUsage.CacheCreationInputTokens += resp.Usage.CacheCreationInputTokens
+		usage.Add(resp.Usage)
 
 		var toolUses []anthropic.ToolUseBlock
 		var textParts []string
@@ -208,7 +205,7 @@ func (c *Client) RunAgent(ctx context.Context, opts ...Option) (*AgentResponse, 
 			return &AgentResponse{
 				Text:  strings.Join(textParts, "\n"),
 				Turns: turn,
-				Usage: totalUsage,
+				Usage: usage.Total(),
 			}, nil
 		}
 
@@ -555,10 +552,13 @@ func clampThinkingBudget(budget int, maxTokens int64) (int, bool) {
 // parameters (temperature/top_p/top_k): sending temperature to them returns a
 // 400 "`temperature` is deprecated for this model." Matched as substrings so
 // aliases and dated snapshots (e.g. claude-opus-4-7, claude-opus-4-8@...) both
-// hit. Opus 4.6, Sonnet 4.6, Haiku 4.5, and older still accept temperature.
+// hit — and "fable-5"/"mythos-5" also cover the 5.1 variants (fable-5-1,
+// mythos-5-1). Opus 4.6, Sonnet 4.6, Haiku 4.5, and older still accept temperature.
 var modelsWithoutSampling = []string{
 	"opus-4-7",
 	"opus-4-8",
+	"opus-5",
+	"sonnet-5",
 	"fable-5",
 	"mythos-5",
 }
