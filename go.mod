@@ -7,12 +7,12 @@ require (
 	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-archive v0.1.28
 	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-client v0.1.28
 	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-mongo-common v1.0.19
-	github.com/anthropics/anthropic-sdk-go v1.72.0
-	github.com/ollama/ollama v0.34.0
+	github.com/anthropics/anthropic-sdk-go v1.80.0
+	github.com/ollama/ollama v0.40.3
 	github.com/rs/zerolog v1.35.1
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.12.1
-	go.mongodb.org/mongo-driver/v2 v2.9.1
+	go.mongodb.org/mongo-driver/v2 v2.9.2
 	gopkg.in/yaml.v3 v3.0.1
 )
 
