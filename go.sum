@@ -10,8 +10,8 @@ github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-archive v0.1.28 h1:wyQ0o3ph
 github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-archive v0.1.28/go.mod h1:Q+LlVYt8qqLyBEgs2JPCBg0FyhVffoD77lGWyu98sHU=
 github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-client v0.1.28 h1:STXVnrNSaO6ebjtBzcb47gbTcJflVqn/0PNvKZSaJ3o=
 github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-http-client v0.1.28/go.mod h1:epkfEKkpm3+6c7y1e/R0bxTO+/WxycnIkikafMhyr/I=
-github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-mongo-common v1.0.24 h1:6tJlvHZkMCUIzrBQKsO+eQa6pzU7+zqDMBpfwkTH1Uc=
-github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-mongo-common v1.0.24/go.mod h1:/OBNOE1pIipdCwAonOJFyF0ttLx6fgmDNybe5tumE90=
+github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-mongo-common v1.0.25 h1:65i2BkxL9yyBYqCjhYvt2R5wJ6bR6WgmAjSFl1liV6E=
+github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-mongo-common v1.0.25/go.mod h1:/OBNOE1pIipdCwAonOJFyF0ttLx6fgmDNybe5tumE90=
 github.com/anthropics/anthropic-sdk-go v1.84.0 h1:mnAhggc5H5A98JYmhQELT+j4J89PYBFKnnSvUTNwNd8=
 github.com/anthropics/anthropic-sdk-go v1.84.0/go.mod h1:GThfYqPJoaQ/6pmibCI98Cr4y5su2FXMUHn3NrSSnIc=
 github.com/aws/aws-sdk-go-v2 v1.38.0 h1:UCRQ5mlqcFk9HJDIqENSLR3wiG1VTWlyUfLDEvY7RxU=
